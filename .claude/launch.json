@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "static-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:\\Users\\Mike\\Optionscalculator\\server.js"],
+      "port": 8080,
+      "autoPort": true
+    }
+  ]
+}

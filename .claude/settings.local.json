@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where devenv:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(npm create:*)",
+      "Bash(npm --version)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where node:*)",
+      "Bash(where npm:*)",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "Bash(where php:*)",
+      "Bash(where ruby:*)",
+      "Bash(where perl:*)",
+      "Bash(powershell -Command \"Get-Command node,python,php,ruby -ErrorAction SilentlyContinue | Select-Object Name,Source\")",
+      "Read(//c/Users/Mike/AppData/Roaming/**)",
+      "Read(//c/Users/Mike/AppData/Local/**)",
+      "Read(//c/Users/Mike/.local/bin//**)",
+      "Bash(where powershell:*)",
+      "Bash(where powershell.exe)",
+      "Read(//c/Windows/System32/WindowsPowerShell/v1.0//**)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"Write-Host 'test'\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File server.ps1)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(powershell -Command 'Get-Process | Where-Object { \\(Get-NetTCPConnection -OwningProcess $_.Id -ErrorAction SilentlyContinue | Where-Object LocalPort -eq 3000\\) } | Stop-Process -Force')",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object OwningProcess, State\")",
+      "Bash(PORT=8080 powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Mike\\\\Options calculator\\\\server.ps1\")",
+      "Bash(curl -s http://localhost:8080/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/)",
+      "Bash(kill %1)",
+      "Bash(node -e \"const h=require\\('http'\\),fs=require\\('fs'\\),path=require\\('path'\\);const m={'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json'};h.createServer\\(\\(req,res\\)=>{let f=path.join\\('.',req.url==='/'?'/index.html':req.url\\);fs.readFile\\(f,\\(e,d\\)=>{if\\(e\\){res.writeHead\\(404\\);res.end\\('Not found'\\)}else{res.writeHead\\(200,{'Content-Type':m[path.extname\\(f\\)]||'application/octet-stream'}\\);res.end\\(d\\)}}\\);}\\).listen\\(8080,\\(\\)=>console.log\\('Server running at http://localhost:8080'\\)\\);\")",
+      "Bash(pkill -f \"node -e\")"
+    ]
+  }
+}
