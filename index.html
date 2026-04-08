@@ -324,6 +324,39 @@ const CSS=`
 
 /* ── Error ── */
 .err{font-size:12px;color:var(--red);margin-top:8px;line-height:1.5}
+
+/* ── View toggle ── */
+.view-toggle{display:flex;gap:4px;background:var(--bg);border:1.5px solid var(--brd);border-radius:9px;padding:3px}
+.vt-btn{
+  display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;border:none;
+  cursor:pointer;font-family:var(--font);font-size:11.5px;font-weight:600;color:var(--t3);
+  background:transparent;transition:all var(--tr);
+}
+.vt-btn.active{background:var(--white);color:var(--blue);box-shadow:var(--shadow-xs);border:1px solid var(--brd)}
+.vt-btn:not(.active):hover{color:var(--t1)}
+
+/* ── Heat map table ── */
+.hmap-wrap{overflow:auto;max-height:520px}
+.hmap{border-collapse:collapse;font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+.hmap th{
+  position:sticky;top:0;z-index:2;
+  padding:7px 10px;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--t3);background:var(--bg);border-bottom:1.5px solid var(--brd);text-align:center;
+}
+.hmap th:first-child{text-align:left;position:sticky;left:0;z-index:3;min-width:72px}
+.hmap th:last-child{position:sticky;right:0;z-index:3;background:var(--bg)}
+.hmap td{padding:4px 8px;text-align:right;border:1px solid rgba(0,0,0,.04);font-size:11px;font-weight:600;font-feature-settings:"tnum" 1}
+.hmap td:first-child{
+  position:sticky;left:0;z-index:1;text-align:left;
+  font-size:11.5px;font-weight:700;color:var(--t2);
+  background:var(--bg);border-right:1.5px solid var(--brd);padding:4px 10px;
+}
+.hmap td:last-child{position:sticky;right:0;z-index:1;background:var(--bg);border-left:1.5px solid var(--brd);padding:4px 10px}
+.hmap tr.cur-price td:first-child{color:var(--blue);background:var(--blue-bg)}
+.hmap tr.cur-price td:last-child{background:var(--blue-bg)}
+
+/* ── Price range row ── */
+.price-range-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 `;
 
 
@@ -456,13 +489,14 @@ function PInput({label,value,onChange,prefix,suffix,step=1,min=0}){
 /* ─────────────────────────────────────────
    PNL CHART
 ───────────────────────────────────────── */
-function PnLChart({strategy,params,dte}){
+function PnLChart({strategy,params,dte,minPrice,maxPrice}){
   const canvasRef=useRef(null);
   const[tip,setTip]=useState(null);
   const[dims,setDims]=useState({w:800,h:360});
   const{stockPrice}=params;
   const range=stockPrice*0.4;
-  const minP=Math.max(stockPrice-range,.01),maxP=stockPrice+range;
+  const minP=minPrice>0?minPrice:Math.max(stockPrice-range,.01);
+  const maxP=maxPrice>minP?maxPrice:stockPrice+range;
   const N=280;
   const PAD={t:28,r:24,b:44,l:80};
 
@@ -594,6 +628,90 @@ function PnLChart({strategy,params,dte}){
 }
 
 /* ─────────────────────────────────────────
+   HEAT MAP TABLE
+───────────────────────────────────────── */
+function HeatMapTable({strategy,params,dte,minPrice,maxPrice}){
+  const{stockPrice,contracts,premium}=params;
+  const n=contracts*100;
+
+  // Auto step size based on range
+  const range=maxPrice-minPrice;
+  const step=range<=15?0.5:range<=40?1:range<=80?2.5:5;
+
+  // Price rows: high → low
+  const prices=[];
+  for(let p=maxPrice;p>=minPrice-0.001;p-=step){
+    prices.push(Math.round(p*100)/100);
+  }
+
+  // DTE columns: current DTE → 0 (expiry), max ~12 cols
+  const numCols=Math.min(12,dte+1);
+  const dteCols=Array.from({length:numCols},(_,i)=>
+    Math.round(dte*(numCols-1-i)/(numCols-1))
+  );
+  if(dteCols[dteCols.length-1]!==0)dteCols[dteCols.length-1]=0;
+
+  // Compute all P&L values
+  const rows=prices.map(price=>({
+    price,
+    cells:dteCols.map(d=>pnl(strategy,params,price,d)),
+    expiryPnl:pnl(strategy,params,price,0),
+  }));
+
+  // Color scale
+  const allVals=rows.flatMap(r=>r.cells);
+  const maxAbs=Math.max(Math.abs(Math.min(...allVals)),Math.abs(Math.max(...allVals)),1);
+
+  const cellStyle=(val)=>{
+    const t=Math.min(Math.abs(val)/maxAbs,1);
+    const alpha=0.08+t*0.72;
+    return val>=0
+      ?{background:`rgba(5,150,105,${alpha})`,color:t>0.55?"#ECFDF5":"#065F46"}
+      :{background:`rgba(220,38,38,${alpha})`,color:t>0.55?"#FEF2F2":"#7F1D1D"};
+  };
+
+  const basis=premium*n;
+
+  return(
+    <div className="hmap-wrap">
+      <table className="hmap">
+        <thead>
+          <tr>
+            <th>Price</th>
+            {dteCols.map(d=>(
+              <th key={d}>{d===0?"Exp":`${d}d`}</th>
+            ))}
+            <th>+/-%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row=>{
+            const isCur=Math.abs(row.price-stockPrice)<step*0.6;
+            const pct=basis>0?(row.expiryPnl/basis)*100:0;
+            return(
+              <tr key={row.price} className={isCur?"cur-price":""}>
+                <td>
+                  ${row.price.toFixed(step<1?2:step===1?2:2)}
+                  {isCur&&<span style={{marginLeft:5,fontSize:8.5,fontWeight:700,color:"var(--blue)",background:"var(--blue-bg)",border:"1px solid var(--blue-brd)",padding:"1px 4px",borderRadius:3}}>NOW</span>}
+                </td>
+                {row.cells.map((val,i)=>(
+                  <td key={i} style={cellStyle(val)}>
+                    {val>=0?"+":""}{val.toFixed(0)}
+                  </td>
+                ))}
+                <td style={{fontWeight:700,color:pct>=0?"var(--green)":"var(--red)"}}>
+                  {pct>=0?"+":""}{pct.toFixed(1)}%
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
    MAIN APP
 ───────────────────────────────────────── */
 function OptionsLab(){
@@ -605,6 +723,9 @@ function OptionsLab(){
   const[dte,setDte]=useState(30);
   const[iv,setIv]=useState(30);
   const[rfr,setRfr]=useState(5.0);
+  const[priceLow,setPriceLow]=useState(0);
+  const[priceHigh,setPriceHigh]=useState(0);
+  const[chartView,setChartView]=useState("chart");
 
   const sp=selected?.price||0;
   const st=STRATS[strategy];
@@ -671,7 +792,12 @@ function OptionsLab(){
 
           {/* Stock Search */}
           <StockSearch
-            onSelect={s=>{setSelected(s);setStrike(Math.round(s.price*.95));}}
+            onSelect={s=>{
+              setSelected(s);
+              setStrike(Math.round(s.price*.95));
+              setPriceLow(Math.round(s.price*.8*2)/2);
+              setPriceHigh(Math.round(s.price*1.2*2)/2);
+            }}
             selected={selected}/>
 
           {/* Strategy */}
@@ -714,6 +840,13 @@ function OptionsLab(){
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 <PInput label="Impl. Vol" value={iv}  onChange={setIv}  suffix="%" step={1}   min={1}/>
                 <PInput label="Risk-Free" value={rfr} onChange={setRfr} suffix="%" step={.25}/>
+              </div>
+              <div style={{borderTop:"1px solid var(--brd-lt)",paddingTop:10,marginTop:2}}>
+                <div className="flabel" style={{marginBottom:6}}>Price Range (Chart &amp; Table)</div>
+                <div className="price-range-row">
+                  <PInput label="Low $" value={priceLow}  onChange={setPriceLow}  prefix="$" step={.5} min={0.01}/>
+                  <PInput label="High $" value={priceHigh} onChange={setPriceHigh} prefix="$" step={.5} min={0.01}/>
+                </div>
               </div>
             </div>
           </div>
@@ -771,7 +904,7 @@ function OptionsLab(){
                 </div>
               )}
 
-              {/* Chart */}
+              {/* Chart / Heatmap */}
               <div className="card fu2">
                 <div className="chart-hd">
                   <div>
@@ -779,13 +912,48 @@ function OptionsLab(){
                       P&L Over Time —{" "}
                       <span style={{color:st.accent}}>{st.name}</span>
                     </div>
-                    <div className="chart-sub">Hover anywhere on the chart to inspect P&L at any stock price</div>
+                    <div className="chart-sub">
+                      {chartView==="chart"
+                        ?"Hover anywhere on the chart to inspect P&L at any stock price"
+                        :"Color-coded P&L grid across price range × time. NOW row = current price."}
+                    </div>
                   </div>
-                  <div className="chart-badge">{selected.symbol} @ ${sp.toFixed(2)}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div className="view-toggle">
+                      <button className={`vt-btn${chartView==="chart"?" active":""}`} onClick={()=>setChartView("chart")}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                        Chart
+                      </button>
+                      <button className={`vt-btn${chartView==="heatmap"?" active":""}`} onClick={()=>setChartView("heatmap")}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                          <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                        </svg>
+                        Heat Map
+                      </button>
+                    </div>
+                    <div className="chart-badge">{selected.symbol} @ ${sp.toFixed(2)}</div>
+                  </div>
                 </div>
-                <div style={{padding:"14px 0 0"}}>
-                  <PnLChart strategy={strategy} params={params} dte={dte}/>
-                </div>
+                {chartView==="chart"?(
+                  <div style={{padding:"14px 0 0"}}>
+                    <PnLChart strategy={strategy} params={params} dte={dte}
+                      minPrice={priceLow} maxPrice={priceHigh}/>
+                  </div>
+                ):(
+                  <div style={{padding:"12px 0 4px"}}>
+                    {priceLow>0&&priceHigh>priceLow?(
+                      <HeatMapTable strategy={strategy} params={params} dte={dte}
+                        minPrice={priceLow} maxPrice={priceHigh}/>
+                    ):(
+                      <div style={{padding:"40px 22px",textAlign:"center",color:"var(--t3)",fontSize:13}}>
+                        Set a Low $ and High $ price range in the Parameters panel to generate the heat map.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Table */}
