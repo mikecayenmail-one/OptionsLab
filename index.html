@@ -563,29 +563,34 @@ const CSS=`
 
 /* ── Mobile responsive ── */
 @media (max-width:640px){
-  /* Prevent page-level horizontal overflow */
-  html,body{overflow-x:hidden;max-width:100%}
-  .page{overflow-x:hidden}
+  /* Hard-constrain everything to viewport width */
+  html{width:100%;overflow-x:hidden}
+  body{width:100%;overflow-x:hidden;max-width:100vw}
+
+  /* Grid blowout fix: grid children must be allowed to shrink below content size */
+  .page{
+    grid-template-columns:minmax(0,1fr);
+    padding:14px 12px;gap:14px;
+    width:100%;box-sizing:border-box;overflow:hidden;
+  }
+  .sidebar,.main-stack{min-width:0;width:100%;overflow:hidden}
 
   /* Header */
-  .hdr{padding:0 14px;height:52px}
+  .hdr{padding:0 14px;height:52px;width:100%;box-sizing:border-box}
   .logo-sub{display:none}
   .hdr-meta{display:none}
   .call-counter{display:none}
   .live-pill{padding:4px 9px;font-size:10px}
 
   /* Strategy bar */
-  .strat-bar{padding:0 4px;overflow-x:auto}
+  .strat-bar{padding:0 4px;overflow-x:auto;width:100%;box-sizing:border-box}
   .sbtn{padding:10px 10px;gap:5px;flex:0 0 auto}
   .sbtn .stag{display:none}
   .strat-desc{padding:8px 14px;font-size:11.5px}
 
-  /* Page: single column */
-  .page{grid-template-columns:1fr;padding:14px 12px;gap:14px}
-
-  /* Card padding; cap width so nothing bleeds off-screen */
+  /* Card padding; force width within grid cell */
   .cp{padding:15px 14px}
-  .card{max-width:100%;overflow:hidden}
+  .card{width:100%;box-sizing:border-box;overflow:hidden;min-width:0}
 
   /* Stock chip: prevent overflow */
   .stock-chip{overflow:hidden}
