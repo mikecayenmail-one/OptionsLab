@@ -592,6 +592,9 @@ const CSS=`
   .cp{padding:15px 14px}
   .card{width:100%;box-sizing:border-box;overflow:hidden;min-width:0}
 
+  /* Prevent iOS Safari auto-zoom on input focus (triggered when font-size < 16px) */
+  input,select,textarea{font-size:16px !important}
+
   /* Stock chip: prevent overflow */
   .stock-chip{overflow:hidden}
 
