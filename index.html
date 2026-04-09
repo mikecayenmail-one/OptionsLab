@@ -985,9 +985,13 @@ function HeatMapTable({strategy,params,dte,minPrice,maxPrice}){
   const{stockPrice,contracts,premium}=params;
   const n=contracts*100;
 
-  // Auto step size based on range
+  // Step size: target ~18 rows, rounded to a clean number
   const range=maxPrice-minPrice;
-  const step=range<=15?0.5:range<=40?1:range<=80?2.5:5;
+  const TARGET_ROWS=18;
+  const rawStep=range/TARGET_ROWS;
+  // Round to nearest clean increment
+  const STEPS=[0.5,1,2,2.5,5,10,15,20,25,50,100,150,200,250,500];
+  const step=STEPS.find(s=>s>=rawStep)||STEPS[STEPS.length-1];
 
   // Price rows: high → low
   const prices=[];
@@ -1330,11 +1334,18 @@ function impliedVol(marketPrice, S, K, T, r, type){
    HELPERS
 ───────────────────────────────────────── */
 // Smart price range based on directional bias
-function autoRange(sp, strat){
+function autoRange(sp, strat, strike=0){
   const bullish = strat==='long_call' || strat==='cash_secured_put';
-  return bullish
-    ? { low: Math.round(sp*0.93*2)/2, high: Math.round(sp*1.22*2)/2 }  // -7% / +22%
-    : { low: Math.round(sp*0.77*2)/2, high: Math.round(sp*1.07*2)/2 }; // -23% / +7%
+  // Base range from stock price
+  let low  = bullish ? sp*0.93 : sp*0.77;
+  let high = bullish ? sp*1.22 : sp*1.07;
+  // Ensure the strike is always visible with a 10% buffer beyond it
+  if(strike>0){
+    if(strike>high) high = strike*1.10;
+    if(strike<low)  low  = strike*0.90;
+  }
+  // Round to nearest $0.50
+  return { low: Math.round(low*2)/2, high: Math.round(high*2)/2 };
 }
 
 // Derive strategy from action (buy/write) + side (call/put)
@@ -1364,14 +1375,14 @@ function OptionsLab(){
   const[selectedContract,setSelectedContract]=useState(null);
   const[contractAction,setContractAction]=useState('buy'); // 'buy' | 'write'
 
-  // Auto price range when strategy or stock price changes (if not manually overridden)
+  // Auto price range when strategy, stock price, or strike changes (if not manually overridden)
   const sp=selected?.price||0;
   useEffect(()=>{
     if(!sp||priceRangeManual) return;
-    const{low,high}=autoRange(sp,strategy);
+    const{low,high}=autoRange(sp,strategy,strike);
     setPriceLow(low);
     setPriceHigh(high);
-  },[sp,strategy,priceRangeManual]);
+  },[sp,strategy,strike,priceRangeManual]);
 
   // Derive strategy when contractAction or selected contract's side changes
   useEffect(()=>{
@@ -1399,9 +1410,9 @@ function OptionsLab(){
     }
 
     setSelectedContract(opt);
-    // Always auto-recalculate range when a contract is freshly selected
+    // Always auto-recalculate range when a contract is freshly selected, including strike
     if(sp){
-      const{low,high}=autoRange(sp,derived);
+      const{low,high}=autoRange(sp,derived,opt.strike);
       setPriceLow(low);
       setPriceHigh(high);
       setPriceRangeManual(false);
@@ -1631,7 +1642,7 @@ function OptionsLab(){
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                   <span className="flabel">Price Range (Chart &amp; Table)</span>
                   {priceRangeManual&&sp>0&&(
-                    <button onClick={()=>{setPriceRangeManual(false);const{low,high}=autoRange(sp,strategy);setPriceLow(low);setPriceHigh(high);}}
+                    <button onClick={()=>{setPriceRangeManual(false);const{low,high}=autoRange(sp,strategy,strike);setPriceLow(low);setPriceHigh(high);}}
                       style={{fontSize:10,color:"var(--blue)",background:"none",border:"none",cursor:"pointer",fontWeight:600,padding:0}}>
                       ↺ Auto
                     </button>
