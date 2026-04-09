@@ -626,14 +626,27 @@ const CSS=`
   @supports (height:1svh){
     .modal{max-height:calc(100svh - 10px);border-radius:20px 20px 0 0}
   }
-  .modal-hd{padding:12px 16px}
-  .modal-title{font-size:14px}
-  .modal-sub{font-size:10.5px}
-  .exp-bar{padding:10px 14px}
-  .chain-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .modal-hd{padding:12px 14px}
+  .modal-title{font-size:13px}
+  .modal-sub{font-size:10px}
+  .modal-close{width:28px;height:28px;font-size:14px}
+  .exp-bar{padding:8px 10px}
+  .exp-label{display:none}
+  .exp-btn{padding:4px 8px;font-size:10px}
+  .chain-wrap{overflow-x:hidden;-webkit-overflow-scrolling:touch}
+
+  /* Chain table: compact to fit 7 cols in ~375px */
+  .chain-tbl{font-size:10px}
+  .chain-tbl .th-group{padding:5px 0;font-size:9px;letter-spacing:.06em}
+  .chain-tbl .th-sub{padding:3px 4px;font-size:8.5px}
+  .chain-tbl .th-strike{padding:3px 4px;font-size:8.5px}
+  .chain-tbl td{padding:4px 4px}
+  .chain-tbl .td-strike{font-size:10.5px;padding:4px 5px}
+  .chain-tbl .td-strike::before{display:none}
+
   /* Bottom close button shown only on mobile */
   .modal-close-mobile{display:flex}
-  .chain-info{padding:6px 14px 6px}
+  .chain-info{padding:5px 12px;font-size:9.5px}
 
   /* Toast: full width */
   .toast-stack{left:10px;right:10px;bottom:10px}
