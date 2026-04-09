@@ -1134,6 +1134,24 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
 }
 
 /* ─────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────── */
+// Smart price range based on directional bias
+function autoRange(sp, strat){
+  const bullish = strat==='long_call' || strat==='cash_secured_put';
+  return bullish
+    ? { low: Math.round(sp*0.93*2)/2, high: Math.round(sp*1.22*2)/2 }  // -7% / +22%
+    : { low: Math.round(sp*0.77*2)/2, high: Math.round(sp*1.07*2)/2 }; // -23% / +7%
+}
+
+// Derive strategy from action (buy/write) + side (call/put)
+function deriveStrategy(action, side){
+  if(action==='buy')   return side==='call' ? 'long_call'    : 'long_put';
+  if(action==='write') return side==='call' ? 'covered_call' : 'cash_secured_put';
+  return 'long_call';
+}
+
+/* ─────────────────────────────────────────
    MAIN APP
 ───────────────────────────────────────── */
 function OptionsLab(){
@@ -1147,18 +1165,43 @@ function OptionsLab(){
   const[rfr,setRfr]=useState(5.0);
   const[priceLow,setPriceLow]=useState(0);
   const[priceHigh,setPriceHigh]=useState(0);
+  const[priceRangeManual,setPriceRangeManual]=useState(false);
   const[chartView,setChartView]=useState("chart");
   const[showOptionsModal,setShowOptionsModal]=useState(false);
   const[selectedContract,setSelectedContract]=useState(null);
+  const[contractAction,setContractAction]=useState('buy'); // 'buy' | 'write'
+
+  // Auto price range when strategy or stock price changes (if not manually overridden)
+  const sp=selected?.price||0;
+  useEffect(()=>{
+    if(!sp||priceRangeManual) return;
+    const{low,high}=autoRange(sp,strategy);
+    setPriceLow(low);
+    setPriceHigh(high);
+  },[sp,strategy,priceRangeManual]);
+
+  // Derive strategy when contractAction or selected contract's side changes
+  useEffect(()=>{
+    if(!selectedContract) return;
+    setStrategy(deriveStrategy(contractAction, selectedContract.side));
+  },[contractAction, selectedContract]);
 
   const handleOptionSelect=useCallback((opt)=>{
-    setStrategy(opt.side==='call'?'long_call':'long_put');
+    const derived=deriveStrategy(contractAction, opt.side);
+    setStrategy(derived);
     setStrike(opt.strike);
     setPremium(parseFloat((opt.mid??opt.ask??0).toFixed(2)));
     setDte(opt.dte??30);
     if(opt.iv!=null) setIv(Math.round(opt.iv*100));
     setSelectedContract(opt);
-  },[]);
+    // Always auto-recalculate range when a contract is freshly selected
+    if(sp){
+      const{low,high}=autoRange(sp,derived);
+      setPriceLow(low);
+      setPriceHigh(high);
+      setPriceRangeManual(false);
+    }
+  },[contractAction, sp]);
 
   // API call tracking
   const tracker=useCallTracker();
@@ -1189,7 +1232,6 @@ function OptionsLab(){
     prevStatus.current=tracker.status;
   },[tracker.status,tracker.count]);
 
-  const sp=selected?.price||0;
   const st=STRATS[strategy];
   const params={strike,premium,contracts,stockPrice:sp,iv,rfr};
   const n=contracts*100;
@@ -1282,7 +1324,7 @@ function OptionsLab(){
           const active=strategy===k;
           return(
             <button key={k} className={`sbtn${active?' active':''}`}
-              onClick={()=>setStrategy(k)}
+              onClick={()=>{setStrategy(k);setPriceRangeManual(false);setSelectedContract(null);}}
               style={{color:active?s.accent:'var(--t3)'}}>
               <span style={{fontSize:16}}>{s.icon}</span>
               <span style={{fontSize:13,fontWeight:700}}>{s.name}</span>
@@ -1306,8 +1348,10 @@ function OptionsLab(){
             onSelect={s=>{
               setSelected(s);
               setStrike(Math.round(s.price*.95));
-              setPriceLow(Math.round(s.price*.8*2)/2);
-              setPriceHigh(Math.round(s.price*1.2*2)/2);
+              const{low,high}=autoRange(s.price,strategy);
+              setPriceLow(low);
+              setPriceHigh(high);
+              setPriceRangeManual(false);
               setSelectedContract(null);
             }}
             selected={selected}
@@ -1317,13 +1361,44 @@ function OptionsLab(){
           {selected&&(
             <div className="card cp fu1">
               <div className="slabel">Option Contract</div>
+
+              {/* Buy / Write toggle */}
+              <div className="field" style={{marginBottom:10}}>
+                <label className="flabel">Position Type</label>
+                <select
+                  value={contractAction}
+                  onChange={e=>{
+                    setContractAction(e.target.value);
+                    // If contract already selected, re-derive strategy immediately
+                    if(selectedContract){
+                      const s=deriveStrategy(e.target.value,selectedContract.side);
+                      setStrategy(s);
+                      setPriceRangeManual(false);
+                    }
+                  }}
+                  style={{
+                    width:'100%',padding:'9px 12px',borderRadius:8,
+                    border:'1.5px solid var(--brd)',background:'var(--white)',
+                    color:'var(--t1)',fontFamily:'var(--font)',fontSize:13,
+                    fontWeight:600,cursor:'pointer',outline:'none',
+                  }}>
+                  <option value="buy">Buy (Long)</option>
+                  <option value="write">Write (Short / Sell)</option>
+                </select>
+                <div style={{fontSize:10.5,color:'var(--t3)',marginTop:4}}>
+                  {contractAction==='buy'
+                    ?'Buying the option — limited risk, unlimited potential'
+                    :'Selling the option — collect premium, capped profit'}
+                </div>
+              </div>
+
               <button className="opt-select-btn" onClick={()=>setShowOptionsModal(true)}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
                 </svg>
                 {selectedContract?'Change Contract':'Select from Options Chain'}
               </button>
-              <ContractBadge contract={selectedContract} onClear={()=>setSelectedContract(null)}/>
+              <ContractBadge contract={selectedContract} onClear={()=>{setSelectedContract(null);}}/>
             </div>
           )}
 
@@ -1340,10 +1415,23 @@ function OptionsLab(){
                 <PInput label="Risk-Free" value={rfr} onChange={setRfr} suffix="%" step={.25}/>
               </div>
               <div style={{borderTop:"1px solid var(--brd-lt)",paddingTop:10,marginTop:2}}>
-                <div className="flabel" style={{marginBottom:6}}>Price Range (Chart &amp; Table)</div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <span className="flabel">Price Range (Chart &amp; Table)</span>
+                  {priceRangeManual&&sp>0&&(
+                    <button onClick={()=>{setPriceRangeManual(false);const{low,high}=autoRange(sp,strategy);setPriceLow(low);setPriceHigh(high);}}
+                      style={{fontSize:10,color:"var(--blue)",background:"none",border:"none",cursor:"pointer",fontWeight:600,padding:0}}>
+                      ↺ Auto
+                    </button>
+                  )}
+                  {!priceRangeManual&&<span style={{fontSize:9.5,color:"var(--green)",fontWeight:600}}>Auto</span>}
+                </div>
                 <div className="price-range-row">
-                  <PInput label="Low $" value={priceLow}  onChange={setPriceLow}  prefix="$" step={.5} min={0.01}/>
-                  <PInput label="High $" value={priceHigh} onChange={setPriceHigh} prefix="$" step={.5} min={0.01}/>
+                  <PInput label="Low $" value={priceLow}
+                    onChange={v=>{setPriceLow(v);setPriceRangeManual(true);}}
+                    prefix="$" step={.5} min={0.01}/>
+                  <PInput label="High $" value={priceHigh}
+                    onChange={v=>{setPriceHigh(v);setPriceRangeManual(true);}}
+                    prefix="$" step={.5} min={0.01}/>
                 </div>
               </div>
             </div>
