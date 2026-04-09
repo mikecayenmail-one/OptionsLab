@@ -563,6 +563,10 @@ const CSS=`
 
 /* ── Mobile responsive ── */
 @media (max-width:640px){
+  /* Prevent page-level horizontal overflow */
+  html,body{overflow-x:hidden;max-width:100%}
+  .page{overflow-x:hidden}
+
   /* Header */
   .hdr{padding:0 14px;height:52px}
   .logo-sub{display:none}
@@ -582,6 +586,12 @@ const CSS=`
   /* Card padding */
   .cp{padding:15px 14px}
 
+  /* Stock chip: fix overflow caused by flexShrink:0 inline style on price */
+  .stock-chip{overflow:hidden}
+  .stock-price{flex-shrink:1 !important;min-width:0}
+  .stock-price-val{font-size:17px !important}
+  .stock-chip-ohlc{flex-wrap:wrap !important;gap:5px 10px !important}
+
   /* Metrics: 2 columns */
   .metrics{grid-template-columns:repeat(2,1fr);gap:10px}
   .mc-val{font-size:20px}
@@ -599,18 +609,25 @@ const CSS=`
   /* Price range inputs stacked */
   .price-range-row{grid-template-columns:1fr}
 
-  /* Modal: full-screen bottom sheet */
+  /* Modal: bottom sheet — height capped safely below iOS browser chrome */
   .modal-overlay{padding:0;align-items:flex-end;backdrop-filter:blur(4px)}
   .modal{
-    width:100%;max-height:94vh;
+    width:100%;
+    max-height:72vh;
     border-radius:20px 20px 0 0;
   }
-  .modal-hd{padding:14px 16px}
+  /* Use small viewport height on browsers that support it (excludes Safari chrome) */
+  @supports (height:1svh){
+    .modal{max-height:calc(100svh - 10px);border-radius:20px 20px 0 0}
+  }
+  .modal-hd{padding:12px 16px}
   .modal-title{font-size:14px}
   .modal-sub{font-size:10.5px}
   .exp-bar{padding:10px 14px}
   .chain-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .chain-info{padding:6px 14px}
+  /* Bottom close button shown only on mobile */
+  .modal-close-mobile{display:flex}
+  .chain-info{padding:6px 14px 6px}
 
   /* Toast: full width */
   .toast-stack{left:10px;right:10px;bottom:10px}
@@ -626,6 +643,11 @@ const CSS=`
   .sbtn{padding:9px 8px;font-size:11.5px}
   .metrics{grid-template-columns:1fr 1fr}
   .greeks{grid-template-columns:repeat(2,1fr)}
+}
+
+/* Desktop: hide mobile-only close button */
+@media (min-width:641px){
+  .modal-close-mobile{display:none}
 }
 `;
 
@@ -715,15 +737,15 @@ function StockSearch({onSelect,selected,onCall}){
                 <span style={{fontSize:11,color:"var(--t3)",maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</span>
               </div>
             </div>
-            <div style={{textAlign:"right",flexShrink:0}}>
-              <div style={{fontFamily:"var(--mono)",fontSize:20,fontWeight:700,color:"var(--t1)",letterSpacing:"-.02em"}}>${selected.price.toFixed(2)}</div>
+            <div className="stock-price" style={{textAlign:"right",flexShrink:0}}>
+              <div className="stock-price-val" style={{fontFamily:"var(--mono)",fontSize:20,fontWeight:700,color:"var(--t1)",letterSpacing:"-.02em"}}>${selected.price.toFixed(2)}</div>
               <div style={{fontFamily:"var(--mono)",fontSize:11.5,fontWeight:600,color:selected.change>=0?"var(--green)":"var(--red)"}}>
                 {selected.change>=0?"+":""}{selected.change.toFixed(2)}{" "}
                 <span style={{opacity:.75}}>({selected.changePct>=0?"+":""}{selected.changePct.toFixed(2)}%)</span>
               </div>
             </div>
           </div>
-          <div style={{display:"flex",gap:16,marginTop:9}}>
+          <div className="stock-chip-ohlc" style={{display:"flex",gap:16,marginTop:9}}>
             {[["O",selected.open],["H",selected.high],["L",selected.low],["PC",selected.prevClose]].map(([l,v])=>(
               <div key={l} style={{fontSize:10.5,color:"var(--t3)"}}>
                 {l}{" "}<span style={{fontFamily:"var(--mono)",fontWeight:600,color:"var(--t2)"}}>${v?.toFixed(2)}</span>
@@ -1248,6 +1270,14 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall,strategy})
         <div className="chain-info">
           Options prices are delayed 15 min · {buying?'Buying — click Ask or Mid':'Selling — click Bid or Mid'} · {dte}d to expiry
         </div>
+
+        {/* Mobile-only close button always visible at bottom */}
+        <button className="modal-close-mobile" onClick={onClose}
+          style={{margin:'0 16px 16px',padding:'11px',borderRadius:10,border:'1.5px solid var(--brd)',
+            background:'var(--bg)',cursor:'pointer',fontFamily:'var(--font)',fontSize:14,
+            fontWeight:600,color:'var(--t2)',alignItems:'center',justifyContent:'center',gap:6}}>
+          ✕ Close
+        </button>
 
       </div>
     </div>
