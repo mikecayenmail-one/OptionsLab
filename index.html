@@ -468,7 +468,10 @@ const CSS=`
 /* Expiration bar */
 .exp-bar{padding:14px 24px;border-bottom:1px solid var(--brd);flex-shrink:0}
 .exp-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:8px}
-.exp-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.exp-nav{display:flex;align-items:center;gap:6px}
+.exp-arrow{flex-shrink:0;width:28px;height:28px;border-radius:7px;border:1.5px solid var(--brd);background:var(--white);cursor:pointer;font-size:18px;line-height:1;color:var(--t3);display:flex;align-items:center;justify-content:center;transition:all var(--tr);padding:0}
+.exp-arrow:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
+.exp-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;flex:1}
 .exp-scroll::-webkit-scrollbar{height:3px}
 .exp-scroll::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
 .exp-btn{
@@ -478,6 +481,7 @@ const CSS=`
 }
 .exp-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
 .exp-btn.active{border-color:var(--blue);background:var(--blue);color:#fff}
+
 
 /* Chain table */
 .chain-wrap{overflow:auto;flex:1}
@@ -504,6 +508,14 @@ const CSS=`
 .chain-tbl tr.atm .td-strike::before{content:"▶";position:absolute;left:6px;font-size:8px;color:var(--blue);top:50%;transform:translateY(-50%)}
 .chain-tbl .itm-call{background:rgba(37,99,235,.04)}
 .chain-tbl .itm-put{background:rgba(220,38,38,.04)}
+.chain-tbl .td-muted{color:var(--t4)!important;opacity:.45;pointer-events:none}
+.chain-tbl .td-inactive{opacity:.18;pointer-events:none}
+.chain-tbl .td-preferred-buy{font-weight:700;color:var(--blue)!important}
+.chain-tbl .td-preferred-sell{font-weight:700;color:var(--red)!important}
+.chain-tbl .th-preferred-buy{color:var(--blue)!important;font-weight:800}
+.chain-tbl .th-preferred-sell{color:var(--red)!important;font-weight:800}
+.chain-tbl .th-muted{opacity:.38}
+.chain-tbl .th-group.side-inactive{opacity:.25}
 .chain-info{font-size:10.5px;color:var(--t4);padding:8px 24px;text-align:center;border-top:1px solid var(--brd);flex-shrink:0;font-family:var(--mono)}
 
 /* Select option button */
@@ -548,6 +560,73 @@ const CSS=`
 .toast-msg{font-size:11.5px;color:var(--t3);line-height:1.5}
 .toast-close{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--t4);font-size:16px;line-height:1;padding:0 0 0 6px;flex-shrink:0}
 .toast-close:hover{color:var(--t2)}
+
+/* ── Mobile responsive ── */
+@media (max-width:640px){
+  /* Header */
+  .hdr{padding:0 14px;height:52px}
+  .logo-sub{display:none}
+  .hdr-meta{display:none}
+  .call-counter{display:none}
+  .live-pill{padding:4px 9px;font-size:10px}
+
+  /* Strategy bar */
+  .strat-bar{padding:0 4px;overflow-x:auto}
+  .sbtn{padding:10px 10px;gap:5px;flex:0 0 auto}
+  .sbtn .stag{display:none}
+  .strat-desc{padding:8px 14px;font-size:11.5px}
+
+  /* Page: single column */
+  .page{grid-template-columns:1fr;padding:14px 12px;gap:14px}
+
+  /* Card padding */
+  .cp{padding:15px 14px}
+
+  /* Metrics: 2 columns */
+  .metrics{grid-template-columns:repeat(2,1fr);gap:10px}
+  .mc-val{font-size:20px}
+
+  /* Greeks: 3 columns */
+  .greeks{grid-template-columns:repeat(3,1fr)}
+
+  /* P&L table: allow horizontal scroll */
+  .hmap-wrap{max-height:360px}
+
+  /* Expiration table */
+  .etbl{font-size:12px}
+  .etbl thead th,.etbl td{padding:8px 10px}
+
+  /* Price range inputs stacked */
+  .price-range-row{grid-template-columns:1fr}
+
+  /* Modal: full-screen bottom sheet */
+  .modal-overlay{padding:0;align-items:flex-end;backdrop-filter:blur(4px)}
+  .modal{
+    width:100%;max-height:94vh;
+    border-radius:20px 20px 0 0;
+  }
+  .modal-hd{padding:14px 16px}
+  .modal-title{font-size:14px}
+  .modal-sub{font-size:10.5px}
+  .exp-bar{padding:10px 14px}
+  .chain-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .chain-info{padding:6px 14px}
+
+  /* Toast: full width */
+  .toast-stack{left:10px;right:10px;bottom:10px}
+  .toast{min-width:unset;max-width:100%}
+
+  /* Empty state */
+  .empty{padding:40px 18px;min-height:260px}
+  .empty-h{font-size:18px}
+  .empty-p{font-size:13px}
+}
+
+@media (max-width:400px){
+  .sbtn{padding:9px 8px;font-size:11.5px}
+  .metrics{grid-template-columns:1fr 1fr}
+  .greeks{grid-template-columns:repeat(2,1fr)}
+}
 `;
 
 
@@ -943,7 +1022,41 @@ function HeatMapTable({strategy,params,dte,minPrice,maxPrice}){
 ───────────────────────────────────────── */
 function fmt(v){return v==null?"—":v.toFixed(2)}
 
-function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
+const STRATEGY_META={
+  long_call:        {label:'Long Call',        side:'call',buying:true },
+  long_put:         {label:'Long Put',         side:'put', buying:true },
+  covered_call:     {label:'Covered Call',     side:'call',buying:false},
+  cash_secured_put: {label:'Cash-Secured Put', side:'put', buying:false},
+};
+
+function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall,strategy}){
+  const meta=STRATEGY_META[strategy]||{label:'',side:'call',buying:true};
+  const{label:strategyLabel,side:relevantSide,buying}=meta;
+
+  // Per-column class helpers
+  const subHdr=(side,col)=>{
+    if(side!==relevantSide) return 'th-sub th-muted';
+    if(buying  && col==='ask') return 'th-sub th-preferred-buy';
+    if(!buying && col==='bid') return 'th-sub th-preferred-sell';
+    if(col==='mid') return 'th-sub';
+    return 'th-sub th-muted';
+  };
+  const cellCls=(side,col,itmCls)=>{
+    const base=side==='call'?'td-call':'td-put';
+    const itm=itmCls?` ${itmCls}`:'';
+    if(side!==relevantSide) return `${base} td-inactive${itm}`;
+    if(buying){
+      if(col==='bid') return `${base} td-muted${itm}`;
+      if(col==='mid') return `${base} td-mid${itm}`;
+      if(col==='ask') return `${base} td-preferred-buy${itm}`;
+    } else {
+      if(col==='bid') return `${base} td-preferred-sell${itm}`;
+      if(col==='mid') return `${base} td-mid${itm}`;
+      if(col==='ask') return `${base} td-muted${itm}`;
+    }
+    return `${base}${itm}`;
+  };
+
   const[expirations,setExpirations]=useState([]);
   const[selExp,setSelExp]=useState(null);
   const[rows,setRows]=useState([]);
@@ -983,11 +1096,11 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
       .finally(()=>setLoading(false));
   },[selExp,symbol]);
 
-  // Format expiration label: "2026-04-17" → "Apr 17"
+  // Format expiration label: "2026-04-17" → "Apr 17/26"
   const fmtExp=s=>{
-    const[,m,d]=s.split('-');
+    const[y,m,d]=s.split('-');
     const months=["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    return`${months[+m]} ${+d}`;
+    return`${months[+m]} ${+d}/${y.slice(2)}`;
   };
 
   // Days to expiry from YYYY-MM-DD string
@@ -997,6 +1110,8 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
   };
 
   const dte=selExp?dteFromExp(selExp):0;
+  const expScrollRef=useRef(null);
+  const scrollExp=dir=>expScrollRef.current?.scrollBy({left:dir*240,behavior:'smooth'});
 
   // Close on overlay click
   const overlayClick=e=>{if(e.target===e.currentTarget)onClose();};
@@ -1045,9 +1160,11 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
         {/* Header */}
         <div className="modal-hd">
           <div>
-            <div className="modal-title">Choose an Option — {symbol}</div>
+            <div className="modal-title">{strategyLabel} — {symbol}</div>
             <div className="modal-sub">
-              {symbol} @ ${stockPrice.toFixed(2)} · Click any row to select a contract
+              {symbol} @ ${stockPrice.toFixed(2)} · {buying
+                ? 'Buying — click the Ask or Mid column to select'
+                : 'Selling — click the Bid or Mid column to select'}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -1056,16 +1173,20 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
         {/* Expiration selector */}
         <div className="exp-bar">
           <div className="exp-label">Expiration date</div>
-          <div className="exp-scroll">
-            {expirations.map(e=>(
-              <button key={e} className={`exp-btn${selExp===e?' active':''}`}
-                onClick={()=>setSelExp(e)}>
-                {fmtExp(e)}
-                <span style={{fontSize:9,opacity:.65,marginLeft:4}}>
-                  {dteFromExp(e)}d
-                </span>
-              </button>
-            ))}
+          <div className="exp-nav">
+            <button className="exp-arrow" onClick={()=>scrollExp(-1)}>‹</button>
+            <div className="exp-scroll" ref={expScrollRef}>
+              {expirations.map(e=>(
+                <button key={e} className={`exp-btn${selExp===e?' active':''}`}
+                  onClick={()=>setSelExp(e)}>
+                  {fmtExp(e)}
+                  <span style={{fontSize:9,marginLeft:4,color:selExp===e?'#fff':'var(--red)',opacity:selExp===e?1:.8}}>
+                    {dteFromExp(e)}d
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button className="exp-arrow" onClick={()=>scrollExp(1)}>›</button>
           </div>
         </div>
 
@@ -1083,17 +1204,17 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
             <table className="chain-tbl">
               <thead>
                 <tr>
-                  <th colSpan={3} className="th-group call-hd">Calls</th>
+                  <th colSpan={3} className={`th-group call-hd${relevantSide!=='call'?' side-inactive':''}`}>Calls</th>
                   <th className="th-group mid-hd th-strike">Strike</th>
-                  <th colSpan={3} className="th-group put-hd">Puts</th>
+                  <th colSpan={3} className={`th-group put-hd${relevantSide!=='put'?' side-inactive':''}`}>Puts</th>
                 </tr>
                 <tr>
                   {['Bid','Mid','Ask'].map(h=>(
-                    <th key={'c'+h} className="th-sub">{h}</th>
+                    <th key={'c'+h} className={subHdr('call',h.toLowerCase())}>{h}</th>
                   ))}
                   <th className="th-sub th-strike">$</th>
                   {['Bid','Mid','Ask'].map(h=>(
-                    <th key={'p'+h} className="th-sub">{h}</th>
+                    <th key={'p'+h} className={subHdr('put',h.toLowerCase())}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1106,15 +1227,15 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
                   return(
                     <tr key={row.strike} className={isAtm?'atm':''} ref={isAtm?atmRef:null}>
                       {/* Call side */}
-                      <td className={`td-call td-dim${itmCall?' itm-call':''}`} onClick={()=>pick(row,'call')}>{fmt(c?.bid)}</td>
-                      <td className={`td-call td-mid${itmCall?' itm-call':''}`} onClick={()=>pick(row,'call')}>{fmt(c?.mid)}</td>
-                      <td className={`td-call td-dim${itmCall?' itm-call':''}`} onClick={()=>pick(row,'call')}>{fmt(c?.ask)}</td>
+                      <td className={cellCls('call','bid',itmCall?'itm-call':'')} onClick={()=>pick(row,'call')}>{fmt(c?.bid)}</td>
+                      <td className={cellCls('call','mid',itmCall?'itm-call':'')} onClick={()=>pick(row,'call')}>{fmt(c?.mid)}</td>
+                      <td className={cellCls('call','ask',itmCall?'itm-call':'')} onClick={()=>pick(row,'call')}>{fmt(c?.ask)}</td>
                       {/* Strike */}
                       <td className="td-strike">${row.strike.toFixed(2)}</td>
                       {/* Put side */}
-                      <td className={`td-put td-dim${itmPut?' itm-put':''}`} onClick={()=>pick(row,'put')}>{fmt(p?.bid)}</td>
-                      <td className={`td-put td-mid${itmPut?' itm-put':''}`} onClick={()=>pick(row,'put')}>{fmt(p?.mid)}</td>
-                      <td className={`td-put td-dim${itmPut?' itm-put':''}`} onClick={()=>pick(row,'put')}>{fmt(p?.ask)}</td>
+                      <td className={cellCls('put','bid',itmPut?'itm-put':'')} onClick={()=>pick(row,'put')}>{fmt(p?.bid)}</td>
+                      <td className={cellCls('put','mid',itmPut?'itm-put':'')} onClick={()=>pick(row,'put')}>{fmt(p?.mid)}</td>
+                      <td className={cellCls('put','ask',itmPut?'itm-put':'')} onClick={()=>pick(row,'put')}>{fmt(p?.ask)}</td>
                     </tr>
                   );
                 })}
@@ -1125,7 +1246,7 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
 
         {/* Footer */}
         <div className="chain-info">
-          Options prices are delayed 15 min · Click any Call or Put cell to select that contract · {dte}d to expiry
+          Options prices are delayed 15 min · {buying?'Buying — click Ask or Mid':'Selling — click Bid or Mid'} · {dte}d to expiry
         </div>
 
       </div>
@@ -1344,6 +1465,7 @@ function OptionsLab(){
         <OptionsChainModal
           symbol={selected.symbol}
           stockPrice={selected.price}
+          strategy={strategy}
           onSelect={handleOptionSelect}
           onClose={()=>setShowOptionsModal(false)}
           onCall={handleApiCall}/>
