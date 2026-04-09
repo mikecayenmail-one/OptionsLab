@@ -72,9 +72,74 @@ function pnl(strat,p,S,days){
 }
 
 /* ─────────────────────────────────────────
+   API CALL TRACKER
+───────────────────────────────────────── */
+const DAILY_LIMIT = 100; // update this when you switch providers
+
+function useCallTracker() {
+  const key = 'optionslab_api_tracker';
+
+  const load = () => {
+    try {
+      const s = JSON.parse(localStorage.getItem(key) || '{}');
+      const today = new Date().toDateString();
+      if (s.date !== today) return { date: today, count: 0, history: [] };
+      return s;
+    } catch { return { date: new Date().toDateString(), count: 0, history: [] }; }
+  };
+
+  const [state, setState] = useState(load);
+
+  const increment = useCallback((endpoint) => {
+    setState(prev => {
+      const today = new Date().toDateString();
+      const base = prev.date !== today ? { date: today, count: 0, history: [] } : prev;
+      const next = {
+        ...base,
+        count: base.count + 1,
+        history: [...(base.history || []).slice(-49), { time: Date.now(), endpoint }],
+      };
+      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  const reset = useCallback(() => {
+    const fresh = { date: new Date().toDateString(), count: 0, history: [] };
+    try { localStorage.setItem(key, JSON.stringify(fresh)); } catch {}
+    setState(fresh);
+  }, []);
+
+  const pct = Math.min((state.count / DAILY_LIMIT) * 100, 100);
+  const status = state.count >= DAILY_LIMIT ? 'over' : state.count >= DAILY_LIMIT * 0.8 ? 'warn' : 'ok';
+
+  return { count: state.count, limit: DAILY_LIMIT, pct, status, increment, reset, history: state.history || [] };
+}
+
+/* ─────────────────────────────────────────
+   TOAST STACK
+───────────────────────────────────────── */
+function ToastStack({ toasts, onDismiss }) {
+  return (
+    <div className="toast-stack">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast${t.out ? ' out' : ''}`}>
+          <div className="toast-icon">{t.icon}</div>
+          <div style={{ flex: 1 }}>
+            <div className="toast-title">{t.title}</div>
+            <div className="toast-msg">{t.msg}</div>
+          </div>
+          <button className="toast-close" onClick={() => onDismiss(t.id)}>×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
    FINNHUB
 ───────────────────────────────────────── */
-function useFinnhub(){
+function useFinnhub({ onCall } = {}){
   const [sr,setSR]=useState([]);
   const [sl,setSL]=useState(false);
   const [ql,setQL]=useState(false);
@@ -86,24 +151,26 @@ function useFinnhub(){
     setSL(true);
     timer.current=setTimeout(async()=>{
       try{
+        onCall?.('search');
         const r=await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         const d=await r.json();
         setSR(d.results||[]);
       }catch{setSR([]);}
       setSL(false);
     },300);
-  },[]);
+  },[onCall]);
   const quote=useCallback(async(sym)=>{
     if(cache.current[sym]&&Date.now()-cache.current[sym].ts<30000)return cache.current[sym].data;
     setQL(true);setQE("");
     try{
+      onCall?.('quote');
       const r=await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`);
       if(!r.ok){const e=await r.json();setQE(e.error||`Could not load ${sym}.`);setQL(false);return null;}
       const data=await r.json();
       cache.current[sym]={data,ts:Date.now()};
       setQL(false);return data;
     }catch{setQE(`Could not load ${sym}.`);setQL(false);return null;}
-  },[]);
+  },[onCall]);
   return{sr,sl,search,quote,ql,qe};
 }
 
@@ -128,11 +195,13 @@ const CSS=`
   --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
   --mono:'JetBrains Mono','Cascadia Code',monospace;
 }
-@keyframes fadeUp {from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-@keyframes spin   {to{transform:rotate(360deg)}}
-@keyframes gradS  {0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-@keyframes dropIn {from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse  {0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes fadeUp  {from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin    {to{transform:rotate(360deg)}}
+@keyframes gradS   {0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes dropIn  {from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse   {0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes slideIn {from{opacity:0;transform:translateX(110%)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(110%)}}
 
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:var(--brd);border-radius:10px}
@@ -357,14 +426,42 @@ const CSS=`
 
 /* ── Price range row ── */
 .price-range-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* ── API Call Counter ── */
+.call-counter{
+  display:flex;align-items:center;gap:7px;padding:5px 11px;
+  border-radius:20px;border:1.5px solid var(--brd);background:var(--white);
+  font-size:11px;font-weight:600;font-family:var(--mono);color:var(--t2);
+  cursor:default;transition:all var(--tr);
+}
+.call-counter.warn{border-color:var(--amber-brd);background:var(--amber-bg);color:var(--amber)}
+.call-counter.over{border-color:var(--red-brd);background:var(--red-bg);color:var(--red)}
+.call-bar-wrap{width:52px;height:5px;border-radius:3px;background:var(--brd);overflow:hidden}
+.call-bar{height:100%;border-radius:3px;transition:width .4s ease,background .4s ease}
+
+/* ── Toast notifications ── */
+.toast-stack{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{
+  display:flex;align-items:flex-start;gap:11px;
+  padding:14px 16px;border-radius:13px;min-width:290px;max-width:360px;
+  background:var(--white);border:1.5px solid var(--brd);
+  box-shadow:var(--shadow-md);pointer-events:all;
+  animation:slideIn .3s cubic-bezier(.4,0,.2,1) forwards;
+}
+.toast.out{animation:slideOut .3s cubic-bezier(.4,0,.2,1) forwards}
+.toast-icon{font-size:18px;line-height:1;flex-shrink:0;margin-top:1px}
+.toast-title{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:3px}
+.toast-msg{font-size:11.5px;color:var(--t3);line-height:1.5}
+.toast-close{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--t4);font-size:16px;line-height:1;padding:0 0 0 6px;flex-shrink:0}
+.toast-close:hover{color:var(--t2)}
 `;
 
 
 /* ─────────────────────────────────────────
    STOCK SEARCH
 ───────────────────────────────────────── */
-function StockSearch({onSelect,selected}){
-  const{sr,sl,search,quote,ql,qe}=useFinnhub();
+function StockSearch({onSelect,selected,onCall}){
+  const{sr,sl,search,quote,ql,qe}=useFinnhub({onCall});
   const[nameQ,setNameQ]=useState("");
   const[tickerQ,setTickerQ]=useState("");
   const[showDD,setShowDD]=useState(false);
@@ -727,6 +824,35 @@ function OptionsLab(){
   const[priceHigh,setPriceHigh]=useState(0);
   const[chartView,setChartView]=useState("chart");
 
+  // API call tracking
+  const tracker=useCallTracker();
+  const[toasts,setToasts]=useState([]);
+  const prevStatus=useRef('ok');
+
+  const addToast=useCallback((icon,title,msg)=>{
+    const id=Date.now();
+    setToasts(t=>[...t,{id,icon,title,msg,out:false}]);
+    setTimeout(()=>setToasts(t=>t.map(x=>x.id===id?{...x,out:true}:x)),6000);
+    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)),6350);
+  },[]);
+
+  const handleApiCall=useCallback((endpoint)=>{
+    tracker.increment(endpoint);
+  },[tracker.increment]);
+
+  // Fire toasts when threshold is crossed
+  useEffect(()=>{
+    if(tracker.status==='warn'&&prevStatus.current==='ok'){
+      addToast('⚠️','Approaching API Limit',
+        `${tracker.count} of ${tracker.limit} daily calls used (${Math.round(tracker.pct)}%). Consider upgrading your plan.`);
+    }
+    if(tracker.status==='over'&&prevStatus.current!=='over'){
+      addToast('🚨','Daily API Limit Reached',
+        `${tracker.count} calls made today. Free tier limit is ${tracker.limit}/day. Requests may start failing.`);
+    }
+    prevStatus.current=tracker.status;
+  },[tracker.status,tracker.count]);
+
   const sp=selected?.price||0;
   const st=STRATS[strategy];
   const params={strike,premium,contracts,stockPrice:sp,iv,rfr};
@@ -780,9 +906,29 @@ function OptionsLab(){
         </div>
         <div className="hdr-right">
           <div className="live-pill"><div className="live-dot"/>Live Data</div>
+          {/* API call counter */}
+          <div className={`call-counter${tracker.status==='warn'?' warn':tracker.status==='over'?' over':''}`}
+            title={`${tracker.count} of ${tracker.limit} API calls used today. Resets at midnight.\nLast: ${tracker.history.length?new Date(tracker.history[tracker.history.length-1].time).toLocaleTimeString():'—'}`}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <span>{tracker.count}<span style={{opacity:.5}}>/{tracker.limit}</span></span>
+            <div className="call-bar-wrap">
+              <div className="call-bar" style={{
+                width:`${tracker.pct}%`,
+                background:tracker.status==='over'?'var(--red)':tracker.status==='warn'?'var(--amber)':'var(--green)'
+              }}/>
+            </div>
+            {tracker.count>0&&(
+              <button onClick={e=>{e.stopPropagation();tracker.reset();}}
+                title="Reset counter"
+                style={{background:'none',border:'none',cursor:'pointer',color:'inherit',opacity:.5,fontSize:11,padding:0,lineHeight:1}}>↺</button>
+            )}
+          </div>
           <span className="hdr-meta">Powered by <b>Finnhub</b></span>
         </div>
       </header>
+      <ToastStack toasts={toasts} onDismiss={id=>setToasts(t=>t.filter(x=>x.id!==id))}/>
 
       {/* ── Page ── */}
       <div className="page">
@@ -798,7 +944,8 @@ function OptionsLab(){
               setPriceLow(Math.round(s.price*.8*2)/2);
               setPriceHigh(Math.round(s.price*1.2*2)/2);
             }}
-            selected={selected}/>
+            selected={selected}
+            onCall={handleApiCall}/>
 
           {/* Strategy */}
           <div className="card cp fu1">
