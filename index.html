@@ -644,6 +644,12 @@ const CSS=`
   .chain-tbl .td-strike{font-size:10.5px;padding:4px 5px}
   .chain-tbl .td-strike::before{display:none}
 
+  /* Increase opacity of dimmed columns so they're legible on small screens */
+  .chain-tbl .td-muted{opacity:.7 !important}
+  .chain-tbl .td-inactive{opacity:.5 !important}
+  .chain-tbl .th-muted{opacity:.6 !important}
+  .chain-tbl .th-group.side-inactive{opacity:.5 !important}
+
   /* Bottom close button shown only on mobile */
   .modal-close-mobile{display:flex}
   .chain-info{padding:5px 12px;font-size:9.5px}
