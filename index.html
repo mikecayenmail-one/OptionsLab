@@ -427,6 +427,88 @@ const CSS=`
 /* ── Price range row ── */
 .price-range-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
+/* ── Options chain modal ── */
+.modal-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(15,23,42,.45);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  animation:fadeUp .2s ease-out;
+}
+.modal{
+  background:var(--white);border-radius:18px;border:1px solid var(--brd);
+  box-shadow:0 24px 64px rgba(0,0,0,.18),0 4px 16px rgba(0,0,0,.08);
+  width:min(960px,100%);max-height:90vh;display:flex;flex-direction:column;
+  overflow:hidden;animation:fadeUp .22s cubic-bezier(.4,0,.2,1);
+}
+.modal-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 24px;border-bottom:1px solid var(--brd);flex-shrink:0;
+}
+.modal-title{font-size:16px;font-weight:700;color:var(--t1);letter-spacing:-.02em}
+.modal-sub{font-size:11.5px;color:var(--t3);margin-top:2px}
+.modal-close{
+  width:32px;height:32px;border-radius:8px;border:1.5px solid var(--brd);
+  background:transparent;cursor:pointer;font-size:17px;color:var(--t3);
+  display:flex;align-items:center;justify-content:center;transition:all var(--tr);
+}
+.modal-close:hover{background:var(--bg);color:var(--t1)}
+
+/* Expiration bar */
+.exp-bar{padding:14px 24px;border-bottom:1px solid var(--brd);flex-shrink:0}
+.exp-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:8px}
+.exp-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.exp-scroll::-webkit-scrollbar{height:3px}
+.exp-scroll::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
+.exp-btn{
+  flex-shrink:0;padding:5px 11px;border-radius:7px;border:1.5px solid var(--brd);
+  background:var(--white);cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600;
+  color:var(--t2);transition:all var(--tr);white-space:nowrap;
+}
+.exp-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
+.exp-btn.active{border-color:var(--blue);background:var(--blue);color:#fff}
+
+/* Chain table */
+.chain-wrap{overflow:auto;flex:1}
+.chain-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.chain-tbl thead{position:sticky;top:0;z-index:10}
+.chain-tbl .th-group{background:var(--bg);padding:7px 0;text-align:center;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--brd)}
+.chain-tbl .th-group.call-hd{color:var(--blue)}
+.chain-tbl .th-group.put-hd{color:var(--red)}
+.chain-tbl .th-group.mid-hd{color:var(--t2)}
+.chain-tbl .th-sub{background:var(--bg);padding:5px 10px;text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t4);border-bottom:1.5px solid var(--brd)}
+.chain-tbl .th-strike{background:var(--bg);text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)}
+.chain-tbl td{padding:5px 10px;text-align:center;border-bottom:1px solid var(--brd-lt)}
+.chain-tbl .td-strike{font-weight:700;font-size:12.5px;color:var(--t1);background:var(--bg);position:relative;text-align:center;border-left:1px solid var(--brd);border-right:1px solid var(--brd)}
+.chain-tbl .td-mid{font-weight:700;color:var(--t1)}
+.chain-tbl .td-dim{color:var(--t3)}
+.chain-tbl tbody tr:hover .td-call{background:#EFF6FF}
+.chain-tbl tbody tr:hover .td-put{background:#FEF2F2}
+.chain-tbl tbody tr:hover .td-strike{background:var(--bg)}
+.chain-tbl .td-call{cursor:pointer}
+.chain-tbl .td-put{cursor:pointer}
+.chain-tbl .td-call:hover{background:#DBEAFE !important}
+.chain-tbl .td-put:hover{background:#FEE2E2 !important}
+.chain-tbl tr.atm .td-strike{background:var(--blue-bg);color:var(--blue)}
+.chain-tbl tr.atm .td-strike::before{content:"▶";position:absolute;left:6px;font-size:8px;color:var(--blue);top:50%;transform:translateY(-50%)}
+.chain-tbl .itm-call{background:rgba(37,99,235,.04)}
+.chain-tbl .itm-put{background:rgba(220,38,38,.04)}
+.chain-info{font-size:10.5px;color:var(--t4);padding:8px 24px;text-align:center;border-top:1px solid var(--brd);flex-shrink:0;font-family:var(--mono)}
+
+/* Select option button */
+.opt-select-btn{
+  display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
+  border:1.5px solid var(--blue-brd);background:var(--blue-bg);cursor:pointer;
+  font-family:var(--font);font-size:12px;font-weight:600;color:var(--blue);
+  transition:all var(--tr);margin-top:11px;width:100%;justify-content:center;
+}
+.opt-select-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.selected-contract{
+  margin-top:10px;padding:10px 13px;border-radius:9px;
+  background:var(--bg);border:1px solid var(--brd);font-family:var(--mono);font-size:11.5px;
+}
+.sc-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.sc-row:last-child{margin-bottom:0}
+
 /* ── API Call Counter ── */
 .call-counter{
   display:flex;align-items:center;gap:7px;padding:5px 11px;
@@ -558,6 +640,42 @@ function StockSearch({onSelect,selected,onCall}){
             ))}
           </div>
           {selected.industry&&<div style={{marginTop:7,fontSize:10.5,color:"var(--t3)"}}>{selected.industry}{selected.cap?` · $${(selected.cap/1000).toFixed(1)}B cap`:""}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   SELECTED CONTRACT BADGE
+───────────────────────────────────────── */
+function ContractBadge({contract,onClear}){
+  if(!contract)return null;
+  const side=contract.side==='call'?'Call':'Put';
+  const color=contract.side==='call'?'var(--blue)':'var(--red)';
+  const bg=contract.side==='call'?'var(--blue-bg)':'var(--red-bg)';
+  const brd=contract.side==='call'?'var(--blue-brd)':'var(--red-brd)';
+  return(
+    <div className="selected-contract" style={{border:`1px solid ${brd}`,background:bg}}>
+      <div className="sc-row">
+        <span style={{fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color}}>Selected Contract</span>
+        <button onClick={onClear} style={{background:'none',border:'none',cursor:'pointer',color:'var(--t4)',fontSize:13,padding:0}}>✕</button>
+      </div>
+      <div className="sc-row" style={{marginTop:4}}>
+        <span style={{fontSize:13,fontWeight:800,color}}>${contract.strike.toFixed(0)} {side}</span>
+        <span style={{color:'var(--t3)',fontSize:11}}>{contract.expiration}</span>
+      </div>
+      <div className="sc-row" style={{marginTop:2}}>
+        <span style={{color:'var(--t3)',fontSize:10.5}}>
+          Mid <span style={{color:'var(--t1)',fontWeight:600}}>${contract.mid?.toFixed(2)??'—'}</span>
+          {' '}· Bid ${contract.bid?.toFixed(2)??'—'}
+          {' '}· Ask ${contract.ask?.toFixed(2)??'—'}
+        </span>
+      </div>
+      {contract.delta!=null&&(
+        <div style={{marginTop:4,fontSize:10,color:'var(--t3)'}}>
+          Δ {contract.delta?.toFixed(3)}
+          {contract.iv!=null&&<span style={{marginLeft:8}}>IV {(contract.iv*100).toFixed(1)}%</span>}
         </div>
       )}
     </div>
@@ -809,6 +927,201 @@ function HeatMapTable({strategy,params,dte,minPrice,maxPrice}){
 }
 
 /* ─────────────────────────────────────────
+   OPTIONS CHAIN MODAL
+───────────────────────────────────────── */
+function fmt(v){return v==null?"—":v.toFixed(2)}
+
+function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
+  const[expirations,setExpirations]=useState([]);
+  const[selExp,setSelExp]=useState(null);
+  const[rows,setRows]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const expCache=useRef({});
+
+  // Load expirations on mount
+  useEffect(()=>{
+    setLoading(true);setError("");
+    onCall?.('options');
+    fetch(`/api/options?symbol=${encodeURIComponent(symbol)}&mode=expirations`)
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.error)throw new Error(d.error);
+        setExpirations(d.expirations||[]);
+        if(d.expirations?.length) setSelExp(d.expirations[0]);
+      })
+      .catch(e=>setError(e.message))
+      .finally(()=>setLoading(false));
+  },[symbol]);
+
+  // Load chain when expiration changes
+  useEffect(()=>{
+    if(!selExp)return;
+    if(expCache.current[selExp]){setRows(expCache.current[selExp]);return;}
+    setLoading(true);setError("");
+    onCall?.('options');
+    fetch(`/api/options?symbol=${encodeURIComponent(symbol)}&mode=chain&expiration=${selExp}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.error)throw new Error(d.error);
+        expCache.current[selExp]=d.rows||[];
+        setRows(d.rows||[]);
+      })
+      .catch(e=>setError(e.message))
+      .finally(()=>setLoading(false));
+  },[selExp,symbol]);
+
+  // Format expiration label: "2026-04-17" → "Apr 17"
+  const fmtExp=s=>{
+    const[,m,d]=s.split('-');
+    const months=["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return`${months[+m]} ${+d}`;
+  };
+
+  // Days to expiry from YYYY-MM-DD string
+  const dteFromExp=s=>{
+    const exp=new Date(s+'T16:00:00');
+    return Math.max(0,Math.round((exp-Date.now())/(1000*60*60*24)));
+  };
+
+  const dte=selExp?dteFromExp(selExp):0;
+
+  // Close on overlay click
+  const overlayClick=e=>{if(e.target===e.currentTarget)onClose();};
+
+  // Keyboard close
+  useEffect(()=>{
+    const h=e=>{if(e.key==='Escape')onClose();};
+    window.addEventListener('keydown',h);
+    return()=>window.removeEventListener('keydown',h);
+  },[onClose]);
+
+  // ATM row = closest strike to current price
+  const atmStrike=rows.length?rows.reduce((best,r)=>
+    Math.abs(r.strike-stockPrice)<Math.abs(best.strike-stockPrice)?r:best
+  ,rows[0])?.strike:null;
+
+  // Auto-scroll to ATM
+  const atmRef=useRef(null);
+  useEffect(()=>{
+    if(atmRef.current)atmRef.current.scrollIntoView({block:'center',behavior:'smooth'});
+  },[rows,atmStrike]);
+
+  const pick=(row,side)=>{
+    const c=row[side];
+    if(!c)return;
+    onSelect({
+      side,
+      strike:    row.strike,
+      mid:       c.mid,
+      bid:       c.bid,
+      ask:       c.ask,
+      iv:        c.iv,
+      delta:     c.delta,
+      theta:     c.theta,
+      dte,
+      expiration:selExp,
+      symbol:    c.symbol,
+    });
+    onClose();
+  };
+
+  return(
+    <div className="modal-overlay" onClick={overlayClick}>
+      <div className="modal">
+
+        {/* Header */}
+        <div className="modal-hd">
+          <div>
+            <div className="modal-title">Choose an Option — {symbol}</div>
+            <div className="modal-sub">
+              {symbol} @ ${stockPrice.toFixed(2)} · Click any row to select a contract
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Expiration selector */}
+        <div className="exp-bar">
+          <div className="exp-label">Expiration date</div>
+          <div className="exp-scroll">
+            {expirations.map(e=>(
+              <button key={e} className={`exp-btn${selExp===e?' active':''}`}
+                onClick={()=>setSelExp(e)}>
+                {fmtExp(e)}
+                <span style={{fontSize:9,opacity:.65,marginLeft:4}}>
+                  {dteFromExp(e)}d
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Chain table */}
+        <div className="chain-wrap">
+          {loading&&(
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:60,color:'var(--t3)',fontSize:13}}>
+              <div className="spin"/><span>Loading options chain…</span>
+            </div>
+          )}
+          {error&&!loading&&(
+            <div style={{padding:40,textAlign:'center',color:'var(--red)',fontSize:13}}>{error}</div>
+          )}
+          {!loading&&!error&&rows.length>0&&(
+            <table className="chain-tbl">
+              <thead>
+                <tr>
+                  <th colSpan={3} className="th-group call-hd">Calls</th>
+                  <th className="th-group mid-hd th-strike">Strike</th>
+                  <th colSpan={3} className="th-group put-hd">Puts</th>
+                </tr>
+                <tr>
+                  {['Bid','Mid','Ask'].map(h=>(
+                    <th key={'c'+h} className="th-sub">{h}</th>
+                  ))}
+                  <th className="th-sub th-strike">$</th>
+                  {['Bid','Mid','Ask'].map(h=>(
+                    <th key={'p'+h} className="th-sub">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(row=>{
+                  const c=row.call,p=row.put;
+                  const isAtm=row.strike===atmStrike;
+                  const itmCall=stockPrice>row.strike;
+                  const itmPut=stockPrice<row.strike;
+                  return(
+                    <tr key={row.strike} className={isAtm?'atm':''} ref={isAtm?atmRef:null}>
+                      {/* Call side */}
+                      <td className={`td-call td-dim${itmCall?' itm-call':''}`} onClick={()=>pick(row,'call')}>{fmt(c?.bid)}</td>
+                      <td className={`td-call td-mid${itmCall?' itm-call':''}`} onClick={()=>pick(row,'call')}>{fmt(c?.mid)}</td>
+                      <td className={`td-call td-dim${itmCall?' itm-call':''}`} onClick={()=>pick(row,'call')}>{fmt(c?.ask)}</td>
+                      {/* Strike */}
+                      <td className="td-strike">${row.strike.toFixed(2)}</td>
+                      {/* Put side */}
+                      <td className={`td-put td-dim${itmPut?' itm-put':''}`} onClick={()=>pick(row,'put')}>{fmt(p?.bid)}</td>
+                      <td className={`td-put td-mid${itmPut?' itm-put':''}`} onClick={()=>pick(row,'put')}>{fmt(p?.mid)}</td>
+                      <td className={`td-put td-dim${itmPut?' itm-put':''}`} onClick={()=>pick(row,'put')}>{fmt(p?.ask)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="chain-info">
+          Options prices are delayed 15 min · Click any Call or Put cell to select that contract · {dte}d to expiry
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
    MAIN APP
 ───────────────────────────────────────── */
 function OptionsLab(){
@@ -823,6 +1136,17 @@ function OptionsLab(){
   const[priceLow,setPriceLow]=useState(0);
   const[priceHigh,setPriceHigh]=useState(0);
   const[chartView,setChartView]=useState("chart");
+  const[showOptionsModal,setShowOptionsModal]=useState(false);
+  const[selectedContract,setSelectedContract]=useState(null);
+
+  const handleOptionSelect=useCallback((opt)=>{
+    setStrategy(opt.side==='call'?'long_call':'long_put');
+    setStrike(opt.strike);
+    setPremium(parseFloat((opt.mid??opt.ask??0).toFixed(2)));
+    setDte(opt.dte??30);
+    if(opt.iv!=null) setIv(Math.round(opt.iv*100));
+    setSelectedContract(opt);
+  },[]);
 
   // API call tracking
   const tracker=useCallTracker();
@@ -930,6 +1254,16 @@ function OptionsLab(){
       </header>
       <ToastStack toasts={toasts} onDismiss={id=>setToasts(t=>t.filter(x=>x.id!==id))}/>
 
+      {/* Options chain modal */}
+      {showOptionsModal&&selected&&(
+        <OptionsChainModal
+          symbol={selected.symbol}
+          stockPrice={selected.price}
+          onSelect={handleOptionSelect}
+          onClose={()=>setShowOptionsModal(false)}
+          onCall={handleApiCall}/>
+      )}
+
       {/* ── Page ── */}
       <div className="page">
 
@@ -943,9 +1277,24 @@ function OptionsLab(){
               setStrike(Math.round(s.price*.95));
               setPriceLow(Math.round(s.price*.8*2)/2);
               setPriceHigh(Math.round(s.price*1.2*2)/2);
+              setSelectedContract(null);
             }}
             selected={selected}
             onCall={handleApiCall}/>
+
+          {/* Options contract selector */}
+          {selected&&(
+            <div className="card cp fu1">
+              <div className="slabel">Option Contract</div>
+              <button className="opt-select-btn" onClick={()=>setShowOptionsModal(true)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+                </svg>
+                {selectedContract?'Change Contract':'Select from Options Chain'}
+              </button>
+              <ContractBadge contract={selectedContract} onClear={()=>setSelectedContract(null)}/>
+            </div>
+          )}
 
           {/* Strategy */}
           <div className="card cp fu1">
