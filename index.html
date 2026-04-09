@@ -1539,7 +1539,7 @@ function OptionsLab(){
                     <div className="chart-sub">
                       {chartView==="chart"
                         ?"Hover anywhere on the chart to inspect P&L at any stock price"
-                        :"Color-coded P&L grid across price range × time. NOW row = current price."}
+                        :"Color-coded P&L grid across price range × time slices. NOW row = current price."}
                       {" "}<span style={{color:"var(--amber)",fontSize:10.5,fontWeight:600}}>
                         Assumes constant IV — actual gains may be higher on large moves (vol expansion).
                       </span>
@@ -1558,7 +1558,7 @@ function OptionsLab(){
                           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                           <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
                         </svg>
-                        Heat Map
+                        P&L Table
                       </button>
                     </div>
                     <div className="chart-badge">{selected.symbol} @ ${sp.toFixed(2)}</div>
@@ -1576,7 +1576,7 @@ function OptionsLab(){
                         minPrice={priceLow} maxPrice={priceHigh}/>
                     ):(
                       <div style={{padding:"40px 22px",textAlign:"center",color:"var(--t3)",fontSize:13}}>
-                        Set a Low $ and High $ price range in the Parameters panel to generate the heat map.
+                        Set a Low $ and High $ price range in the Parameters panel to generate the P&L table.
                       </div>
                     )}
                   </div>
