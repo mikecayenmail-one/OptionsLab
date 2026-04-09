@@ -281,15 +281,27 @@ const CSS=`
 }
 .btn-ghost:hover{border-color:var(--t3);color:var(--t1);background:var(--bg)}
 
-/* ── Strategy grid ── */
-.strat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.sbtn{
-  padding:12px 13px;border-radius:10px;border:1.5px solid var(--brd);
-  background:var(--white);cursor:pointer;text-align:left;
-  box-shadow:var(--shadow-xs);transition:all var(--tr);
+/* ── Strategy bar (horizontal top strip) ── */
+.strat-bar{
+  background:var(--white);border-bottom:1px solid var(--brd);
+  padding:0 40px;display:flex;align-items:stretch;gap:0;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
 }
-.sbtn:hover{box-shadow:var(--shadow-sm);transform:translateY(-1px)}
-.stag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:4px}
+.sbtn{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 20px;border:none;border-bottom:2.5px solid transparent;
+  background:transparent;cursor:pointer;text-align:left;
+  transition:all var(--tr);flex:1;justify-content:center;
+  border-radius:0;
+}
+.sbtn:hover{background:var(--bg)}
+.sbtn.active{border-bottom-color:currentColor;background:var(--bg)}
+.stag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.strat-desc{
+  padding:8px 40px;font-size:12px;color:var(--t2);line-height:1.6;
+  border-bottom:1px solid var(--brd);background:var(--bg);
+  transition:all var(--tr);
+}
 
 /* ── Dropdown ── */
 .dd{
@@ -1264,6 +1276,25 @@ function OptionsLab(){
           onCall={handleApiCall}/>
       )}
 
+      {/* ── Strategy bar ── */}
+      <div className="strat-bar">
+        {Object.entries(STRATS).map(([k,s])=>{
+          const active=strategy===k;
+          return(
+            <button key={k} className={`sbtn${active?' active':''}`}
+              onClick={()=>setStrategy(k)}
+              style={{color:active?s.accent:'var(--t3)'}}>
+              <span style={{fontSize:16}}>{s.icon}</span>
+              <span style={{fontSize:13,fontWeight:700}}>{s.name}</span>
+              <span className="stag" style={{background:s.tagBg,color:s.tagC}}>{s.tag}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="strat-desc">
+        <span style={{fontWeight:600,color:st.accent}}>{st.name}:</span>{' '}{st.desc}
+      </div>
+
       {/* ── Page ── */}
       <div className="page">
 
@@ -1295,35 +1326,6 @@ function OptionsLab(){
               <ContractBadge contract={selectedContract} onClear={()=>setSelectedContract(null)}/>
             </div>
           )}
-
-          {/* Strategy */}
-          <div className="card cp fu1">
-            <div className="slabel">Strategy</div>
-            <div className="strat-grid">
-              {Object.entries(STRATS).map(([k,s])=>{
-                const active=strategy===k;
-                return(
-                  <button key={k} className="sbtn" onClick={()=>setStrategy(k)}
-                    style={{
-                      borderColor:active?s.accent:undefined,
-                      background:active?s.tagBg:undefined,
-                      boxShadow:active?`0 0 0 1px ${s.accent}33,var(--shadow-sm)`:undefined,
-                    }}>
-                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-                      <span style={{fontSize:14}}>{s.icon}</span>
-                      <span style={{fontSize:12,fontWeight:700,color:active?s.accent:"var(--t1)"}}>{s.name}</span>
-                    </div>
-                    <span className="stag" style={{background:s.tagBg,color:s.tagC}}>{s.tag}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{
-              marginTop:10,padding:"10px 13px",borderRadius:9,
-              background:`${st.tagBg}`,border:`1.5px solid ${st.accent}22`,
-              fontSize:12,color:"var(--t2)",lineHeight:1.65,
-            }}>{st.desc}</div>
-          </div>
 
           {/* Parameters */}
           <div className="card cp fu2">
