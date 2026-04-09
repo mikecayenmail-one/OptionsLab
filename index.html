@@ -583,8 +583,9 @@ const CSS=`
   /* Page: single column */
   .page{grid-template-columns:1fr;padding:14px 12px;gap:14px}
 
-  /* Card padding */
+  /* Card padding; cap width so nothing bleeds off-screen */
   .cp{padding:15px 14px}
+  .card{max-width:100%;overflow:hidden}
 
   /* Stock chip: prevent overflow */
   .stock-chip{overflow:hidden}
@@ -727,18 +728,19 @@ function StockSearch({onSelect,selected,onCall}){
       {selected&&(
         <div className="stock-chip">
           <div style={{fontSize:9.5,fontWeight:700,color:"var(--blue)",letterSpacing:".09em",textTransform:"uppercase",marginBottom:4}}>Selected</div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
-            <div style={{display:"flex",alignItems:"baseline",gap:7,minWidth:0,flex:"1 1 auto"}}>
-              <span style={{fontFamily:"var(--mono)",fontSize:18,fontWeight:800,color:"var(--t1)",letterSpacing:"-.02em",flexShrink:0}}>{selected.symbol}</span>
-              <span style={{fontSize:11,color:"var(--t3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>{selected.name}</span>
-            </div>
-            <div style={{display:"flex",alignItems:"baseline",gap:6,flexShrink:0}}>
-              <span style={{fontFamily:"var(--mono)",fontSize:18,fontWeight:700,color:"var(--t1)",letterSpacing:"-.02em"}}>${selected.price.toFixed(2)}</span>
-              <span style={{fontFamily:"var(--mono)",fontSize:11,fontWeight:600,color:selected.change>=0?"var(--green)":"var(--red)",whiteSpace:"nowrap"}}>
-                {selected.change>=0?"+":""}{selected.change.toFixed(2)} ({selected.changePct>=0?"+":""}{selected.changePct.toFixed(2)}%)
-              </span>
-            </div>
+          {/* Row 1: symbol + name (name truncates) */}
+          <div style={{display:"flex",alignItems:"baseline",gap:7,minWidth:0,overflow:"hidden"}}>
+            <span style={{fontFamily:"var(--mono)",fontSize:18,fontWeight:800,color:"var(--t1)",letterSpacing:"-.02em",flexShrink:0}}>{selected.symbol}</span>
+            <span style={{fontSize:11,color:"var(--t3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>{selected.name}</span>
           </div>
+          {/* Row 2: price + change on own line, wraps naturally */}
+          <div style={{display:"flex",alignItems:"baseline",gap:8,marginTop:2,flexWrap:"wrap"}}>
+            <span style={{fontFamily:"var(--mono)",fontSize:18,fontWeight:700,color:"var(--t1)",letterSpacing:"-.02em"}}>${selected.price.toFixed(2)}</span>
+            <span style={{fontFamily:"var(--mono)",fontSize:11,fontWeight:600,color:selected.change>=0?"var(--green)":"var(--red)"}}>
+              {selected.change>=0?"+":""}{selected.change.toFixed(2)} ({selected.changePct>=0?"+":""}{selected.changePct.toFixed(2)}%)
+            </span>
+          </div>
+          {/* Row 3: OHLC wraps */}
           <div style={{display:"flex",flexWrap:"wrap",gap:"4px 14px",marginTop:8}}>
             {[["O",selected.open],["H",selected.high],["L",selected.low],["PC",selected.prevClose]].map(([l,v])=>(
               <div key={l} style={{fontSize:10.5,color:"var(--t3)"}}>
@@ -746,7 +748,7 @@ function StockSearch({onSelect,selected,onCall}){
               </div>
             ))}
           </div>
-          {selected.industry&&<div style={{marginTop:6,fontSize:10.5,color:"var(--t3)"}}>{selected.industry}{selected.cap?` · $${(selected.cap/1000).toFixed(1)}B cap`:""}</div>}
+          {selected.industry&&<div style={{marginTop:6,fontSize:10.5,color:"var(--t3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.industry}{selected.cap?` · $${(selected.cap/1000).toFixed(1)}B cap`:""}</div>}
         </div>
       )}
     </div>
