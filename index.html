@@ -586,11 +586,8 @@ const CSS=`
   /* Card padding */
   .cp{padding:15px 14px}
 
-  /* Stock chip: fix overflow caused by flexShrink:0 inline style on price */
+  /* Stock chip: prevent overflow */
   .stock-chip{overflow:hidden}
-  .stock-price{flex-shrink:1 !important;min-width:0}
-  .stock-price-val{font-size:17px !important}
-  .stock-chip-ohlc{flex-wrap:wrap !important;gap:5px 10px !important}
 
   /* Metrics: 2 columns */
   .metrics{grid-template-columns:repeat(2,1fr);gap:10px}
@@ -729,30 +726,27 @@ function StockSearch({onSelect,selected,onCall}){
 
       {selected&&(
         <div className="stock-chip">
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div>
-              <div style={{fontSize:9.5,fontWeight:700,color:"var(--blue)",letterSpacing:".09em",textTransform:"uppercase",marginBottom:3}}>Selected</div>
-              <div style={{display:"flex",alignItems:"baseline",gap:7}}>
-                <span style={{fontFamily:"var(--mono)",fontSize:18,fontWeight:800,color:"var(--t1)",letterSpacing:"-.02em"}}>{selected.symbol}</span>
-                <span style={{fontSize:11,color:"var(--t3)",maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.name}</span>
-              </div>
+          <div style={{fontSize:9.5,fontWeight:700,color:"var(--blue)",letterSpacing:".09em",textTransform:"uppercase",marginBottom:4}}>Selected</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:7,minWidth:0,flex:"1 1 auto"}}>
+              <span style={{fontFamily:"var(--mono)",fontSize:18,fontWeight:800,color:"var(--t1)",letterSpacing:"-.02em",flexShrink:0}}>{selected.symbol}</span>
+              <span style={{fontSize:11,color:"var(--t3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>{selected.name}</span>
             </div>
-            <div className="stock-price" style={{textAlign:"right",flexShrink:0}}>
-              <div className="stock-price-val" style={{fontFamily:"var(--mono)",fontSize:20,fontWeight:700,color:"var(--t1)",letterSpacing:"-.02em"}}>${selected.price.toFixed(2)}</div>
-              <div style={{fontFamily:"var(--mono)",fontSize:11.5,fontWeight:600,color:selected.change>=0?"var(--green)":"var(--red)"}}>
-                {selected.change>=0?"+":""}{selected.change.toFixed(2)}{" "}
-                <span style={{opacity:.75}}>({selected.changePct>=0?"+":""}{selected.changePct.toFixed(2)}%)</span>
-              </div>
+            <div style={{display:"flex",alignItems:"baseline",gap:6,flexShrink:0}}>
+              <span style={{fontFamily:"var(--mono)",fontSize:18,fontWeight:700,color:"var(--t1)",letterSpacing:"-.02em"}}>${selected.price.toFixed(2)}</span>
+              <span style={{fontFamily:"var(--mono)",fontSize:11,fontWeight:600,color:selected.change>=0?"var(--green)":"var(--red)",whiteSpace:"nowrap"}}>
+                {selected.change>=0?"+":""}{selected.change.toFixed(2)} ({selected.changePct>=0?"+":""}{selected.changePct.toFixed(2)}%)
+              </span>
             </div>
           </div>
-          <div className="stock-chip-ohlc" style={{display:"flex",gap:16,marginTop:9}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:"4px 14px",marginTop:8}}>
             {[["O",selected.open],["H",selected.high],["L",selected.low],["PC",selected.prevClose]].map(([l,v])=>(
               <div key={l} style={{fontSize:10.5,color:"var(--t3)"}}>
                 {l}{" "}<span style={{fontFamily:"var(--mono)",fontWeight:600,color:"var(--t2)"}}>${v?.toFixed(2)}</span>
               </div>
             ))}
           </div>
-          {selected.industry&&<div style={{marginTop:7,fontSize:10.5,color:"var(--t3)"}}>{selected.industry}{selected.cap?` · $${(selected.cap/1000).toFixed(1)}B cap`:""}</div>}
+          {selected.industry&&<div style={{marginTop:6,fontSize:10.5,color:"var(--t3)"}}>{selected.industry}{selected.cap?` · $${(selected.cap/1000).toFixed(1)}B cap`:""}</div>}
         </div>
       )}
     </div>
