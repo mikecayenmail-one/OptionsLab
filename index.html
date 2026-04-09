@@ -1134,6 +1134,25 @@ function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall}){
 }
 
 /* ─────────────────────────────────────────
+   IMPLIED VOLATILITY — bisection solver
+   Finds the IV that makes BS price = market price
+───────────────────────────────────────── */
+function impliedVol(marketPrice, S, K, T, r, type){
+  if(T<=0||marketPrice<=0||S<=0||K<=0) return 0.30;
+  // Can't solve if price is at/below intrinsic
+  const intrinsic=type==='call'?Math.max(S-K,0):Math.max(K-S,0);
+  if(marketPrice<=intrinsic+0.001) return 0.001;
+  let lo=0.001, hi=5.0;
+  for(let i=0;i<300;i++){
+    const mid=(lo+hi)/2;
+    const price=bsPrice(S,K,T,r,mid,type);
+    if(price<marketPrice) lo=mid; else hi=mid;
+    if(hi-lo<0.00005) break;
+  }
+  return(lo+hi)/2;
+}
+
+/* ─────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────── */
 // Smart price range based on directional bias
@@ -1190,9 +1209,21 @@ function OptionsLab(){
     const derived=deriveStrategy(contractAction, opt.side);
     setStrategy(derived);
     setStrike(opt.strike);
-    setPremium(parseFloat((opt.mid??opt.ask??0).toFixed(2)));
-    setDte(opt.dte??30);
-    if(opt.iv!=null) setIv(Math.round(opt.iv*100));
+    const mktPrice=parseFloat((opt.mid??opt.ask??0).toFixed(2));
+    setPremium(mktPrice);
+    const daysLeft=opt.dte??30;
+    setDte(daysLeft);
+
+    // IV: use API value if valid, otherwise back-calculate from market price
+    if(opt.iv!=null && opt.iv>0.005){
+      setIv(Math.round(opt.iv*100*10)/10); // round to 1 decimal
+    } else if(mktPrice>0 && sp>0){
+      const T=daysLeft/365;
+      const side=opt.side==='call'?'call':'put';
+      const calcIV=impliedVol(mktPrice, sp, opt.strike, T, rfr/100, side);
+      setIv(Math.round(calcIV*100*10)/10);
+    }
+
     setSelectedContract(opt);
     // Always auto-recalculate range when a contract is freshly selected
     if(sp){
@@ -1201,7 +1232,7 @@ function OptionsLab(){
       setPriceHigh(high);
       setPriceRangeManual(false);
     }
-  },[contractAction, sp]);
+  },[contractAction, sp, rfr]);
 
   // API call tracking
   const tracker=useCallTracker();
@@ -1253,8 +1284,8 @@ function OptionsLab(){
 
   const metrics=summary?[
     {label:"Max Profit", val:summary.mp==="∞"?"∞":`$${summary.mp}`, color:"var(--green)", bar:"var(--green)", sub:"Best case at expiry"},
-    {label:"Max Loss",   val:`-$${summary.ml}`,                      color:"var(--red)",   bar:"var(--red)",   sub:"Worst case scenario"},
-    {label:"Breakeven",  val:`$${summary.be}`,                       color:"var(--amber)", bar:"var(--amber)", sub:"Price needed to B/E"},
+    {label:"Max Loss",   val:`-$${summary.ml}`,                      color:"var(--red)",   bar:"var(--red)",   sub:`Premium paid · ${contracts} contract${contracts!==1?"s":""}`},
+    {label:"Breakeven",  val:`$${summary.be}`,                       color:"var(--amber)", bar:"var(--amber)", sub:"At expiry only — not before"},
     {label:"Current P&L",val:`${summary.cur>=0?"+":""}$${Math.abs(summary.cur).toFixed(2)}`,
       color:summary.cur>=0?"var(--green)":"var(--red)",
       bar:summary.cur>=0?"var(--green)":"var(--red)",
@@ -1411,7 +1442,14 @@ function OptionsLab(){
               <PInput label="Contracts"      value={contracts} onChange={setContracts} step={1}   min={1}/>
               <PInput label="Days to Expiry" value={dte}       onChange={setDte}       suffix="days" step={1} min={0}/>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <PInput label="Impl. Vol" value={iv}  onChange={setIv}  suffix="%" step={1}   min={1}/>
+                <div>
+                  <PInput label="Impl. Vol" value={iv} onChange={setIv} suffix="%" step={0.1} min={0.1}/>
+                  {selectedContract&&(
+                    <div style={{fontSize:9.5,color:"var(--green)",marginTop:3,fontWeight:600}}>
+                      {selectedContract.iv&&selectedContract.iv>0.005?"↑ From API":"↑ Back-calculated from market price"}
+                    </div>
+                  )}
+                </div>
                 <PInput label="Risk-Free" value={rfr} onChange={setRfr} suffix="%" step={.25}/>
               </div>
               <div style={{borderTop:"1px solid var(--brd-lt)",paddingTop:10,marginTop:2}}>
@@ -1502,6 +1540,9 @@ function OptionsLab(){
                       {chartView==="chart"
                         ?"Hover anywhere on the chart to inspect P&L at any stock price"
                         :"Color-coded P&L grid across price range × time. NOW row = current price."}
+                      {" "}<span style={{color:"var(--amber)",fontSize:10.5,fontWeight:600}}>
+                        Assumes constant IV — actual gains may be higher on large moves (vol expansion).
+                      </span>
                     </div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
