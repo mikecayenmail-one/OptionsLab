@@ -1607,26 +1607,36 @@ function OptionsLab(){
                       </tr>
                     </thead>
                     <tbody>
-                      {Array.from({length:11},(_,i)=>{
-                        const step=sp*.05;
-                        const price=Math.max(sp-step*5+step*i,.01);
-                        const total=pnl(strategy,params,price,0);
-                        const ps=total/n;
+                      {(()=>{
+                        const bearish=strategy==='long_put'||strategy==='covered_call';
+                        // Bearish: deep below strike → only 3 above current
+                        // Bullish: only 3 below current → deep above strike
+                        const lo=bearish?Math.max(strike*0.68,0.01):Math.max(sp*0.91,0.01);
+                        const hi=bearish?sp*1.12:strike*1.32;
+                        const N=18;
+                        const step=(hi-lo)/(N-1);
                         const basis=premium*n;
-                        const pct=basis>0?(total/basis)*100:0;
-                        const isCur=Math.abs(price-sp)<step*.3;
-                        return(
-                          <tr key={i} className={isCur?"cur":""}>
-                            <td>
-                              ${price.toFixed(2)}
-                              {isCur&&<span style={{marginLeft:8,fontSize:9.5,fontWeight:700,color:"var(--blue)",background:"var(--blue-bg)",border:"1px solid var(--blue-brd)",padding:"1px 6px",borderRadius:4,verticalAlign:"middle"}}>NOW</span>}
-                            </td>
-                            <td className={ps>=0?"pos":"neg"}>{ps>=0?"+":""}{ps.toFixed(2)}</td>
-                            <td className={total>=0?"pos":"neg"} style={{fontWeight:700}}>{total>=0?"+":""}${total.toFixed(2)}</td>
-                            <td className={pct>=0?"pos":"neg"}>{pct>=0?"+":""}{pct.toFixed(1)}%</td>
-                          </tr>
-                        );
-                      })}
+                        return Array.from({length:N},(_,i)=>{
+                          const price=lo+step*i;
+                          const total=pnl(strategy,params,price,0);
+                          const ps=total/n;
+                          const pct=basis>0?(total/basis)*100:0;
+                          const isCur=Math.abs(price-sp)<step*.55;
+                          const isStrike=Math.abs(price-strike)<step*.55;
+                          return(
+                            <tr key={i} className={isCur?"cur":""}>
+                              <td>
+                                ${price.toFixed(2)}
+                                {isCur&&<span style={{marginLeft:8,fontSize:9.5,fontWeight:700,color:"var(--blue)",background:"var(--blue-bg)",border:"1px solid var(--blue-brd)",padding:"1px 6px",borderRadius:4,verticalAlign:"middle"}}>NOW</span>}
+                                {isStrike&&!isCur&&<span style={{marginLeft:8,fontSize:9.5,fontWeight:700,color:"var(--amber)",background:"var(--amber-bg)",border:"1px solid var(--amber-brd)",padding:"1px 6px",borderRadius:4,verticalAlign:"middle"}}>STRIKE</span>}
+                              </td>
+                              <td className={ps>=0?"pos":"neg"}>{ps>=0?"+":""}{ps.toFixed(2)}</td>
+                              <td className={total>=0?"pos":"neg"} style={{fontWeight:700}}>{total>=0?"+":""}${total.toFixed(2)}</td>
+                              <td className={pct>=0?"pos":"neg"}>{pct>=0?"+":""}{pct.toFixed(1)}%</td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>
