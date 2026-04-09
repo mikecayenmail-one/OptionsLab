@@ -725,7 +725,7 @@ function PnLChart({strategy,params,dte,minPrice,maxPrice}){
   const minP=minPrice>0?minPrice:Math.max(stockPrice-range,.01);
   const maxP=maxPrice>minP?maxPrice:stockPrice+range;
   const N=280;
-  const PAD={t:28,r:24,b:44,l:80};
+  const PAD={t:50,r:24,b:44,l:80};
 
   const slices=useMemo(()=>[
     {d:dte,                   label:`Today (${dte}d)`,              color:"#2563EB",w:1.5},
@@ -766,15 +766,15 @@ function PnLChart({strategy,params,dte,minPrice,maxPrice}){
     // Y grid + labels
     for(let i=0;i<=5;i++){
       const val=yLo+(yHi-yLo)*i/5,y=toY(val);
-      ctx.strokeStyle="rgba(15,23,42,.06)";ctx.lineWidth=1;
+      ctx.strokeStyle="rgba(15,23,42,.07)";ctx.lineWidth=1;
       ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(W-PAD.r,y);ctx.stroke();
-      ctx.fillStyle="#94A3B8";ctx.textAlign="right";
+      ctx.fillStyle="#1E293B";ctx.textAlign="right";
       ctx.fillText(`${val>=0?"+":""}$${val.toFixed(0)}`,PAD.l-8,y+4);
     }
     // X labels
     for(let i=0;i<=6;i++){
       const val=minP+(maxP-minP)*i/6,x=toX(val);
-      ctx.fillStyle="#94A3B8";ctx.textAlign="center";
+      ctx.fillStyle="#1E293B";ctx.textAlign="center";
       ctx.fillText(`$${val.toFixed(0)}`,x,H-PAD.b+16);
     }
     // Zero line
@@ -785,10 +785,10 @@ function PnLChart({strategy,params,dte,minPrice,maxPrice}){
     }
     // Current price line
     const cpx=toX(stockPrice);
-    ctx.strokeStyle="rgba(37,99,235,.25)";ctx.lineWidth=1;ctx.setLineDash([5,4]);
+    ctx.strokeStyle="rgba(15,23,42,.35)";ctx.lineWidth=1;ctx.setLineDash([5,4]);
     ctx.beginPath();ctx.moveTo(cpx,PAD.t);ctx.lineTo(cpx,H-PAD.b);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle="rgba(37,99,235,.65)";ctx.font="10px 'JetBrains Mono',monospace";ctx.textAlign="center";
-    ctx.fillText(`$${stockPrice.toFixed(2)}`,cpx,PAD.t-8);
+    ctx.fillStyle="#0F172A";ctx.font="10.5px 'JetBrains Mono',monospace";ctx.textAlign="center";
+    ctx.fillText(`$${stockPrice.toFixed(2)}`,cpx,PAD.t-10);
 
     // Fill under expiry curve
     const exp=slices[slices.length-1],y0=toY(0);
@@ -822,7 +822,7 @@ function PnLChart({strategy,params,dte,minPrice,maxPrice}){
     <div style={{position:"relative",width:"100%",height:360}}>
       <canvas ref={canvasRef} style={{width:"100%",height:"100%",cursor:"crosshair",borderRadius:"0 0 13px 13px"}}
         onMouseMove={onMouse} onMouseLeave={()=>setTip(null)}/>
-      <div style={{position:"absolute",top:8,right:12}} className="chart-legend">
+      <div style={{position:"absolute",top:6,right:12}} className="chart-legend">
         {slices.map((s,i)=>(
           <div key={i} className="cl-item" style={{color:s.color}}>
             <div className="cl-line" style={{background:s.color}}/>
