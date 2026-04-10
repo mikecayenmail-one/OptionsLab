@@ -31,7 +31,21 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/)",
       "Bash(kill %1)",
       "Bash(node -e \"const h=require\\('http'\\),fs=require\\('fs'\\),path=require\\('path'\\);const m={'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json'};h.createServer\\(\\(req,res\\)=>{let f=path.join\\('.',req.url==='/'?'/index.html':req.url\\);fs.readFile\\(f,\\(e,d\\)=>{if\\(e\\){res.writeHead\\(404\\);res.end\\('Not found'\\)}else{res.writeHead\\(200,{'Content-Type':m[path.extname\\(f\\)]||'application/octet-stream'}\\);res.end\\(d\\)}}\\);}\\).listen\\(8080,\\(\\)=>console.log\\('Server running at http://localhost:8080'\\)\\);\")",
-      "Bash(pkill -f \"node -e\")"
+      "Bash(pkill -f \"node -e\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git rm:*)",
+      "Bash(curl -s \"http://localhost:53822/api/quote?symbol=NVDA\")",
+      "Bash(curl -s \"https://finnhub.io/api/v1/quote?symbol=NVDA&token=d7ase31r01qtpbh9llm0d7ase31r01qtpbh9llmg\")",
+      "Bash(curl -s \"http://localhost:53822/api/search?q=NVDA\")",
+      "Bash(node -e ':*)",
+      "Bash(curl -s \"http://localhost:63462/api/quote?symbol=NVDA\")",
+      "Bash(curl -s -H \"Authorization: Token dHlOaENXQ0g5VHNENEpqV0kwblFIYnJWcHFyYjVoTTJqZ1dLcnAybmJVMD0\" \"https://api.marketdata.app/v1/options/expirations/NVDA/\")",
+      "Bash(curl -s -H \"Authorization: Token dHlOaENXQ0g5VHNENEpqV0kwblFIYnJWcHFyYjVoTTJqZ1dLcnAybmJVMD0\" \"https://api.marketdata.app/v1/options/chain/NVDA/?expiration=2025-07-17&side=call\")",
+      "Bash(curl -s -H \"Authorization: Token dHlOaENXQ0g5VHNENEpqV0kwblFIYnJWcHFyYjVoTTJqZ1dLcnAybmJVMD0\" \"https://api.marketdata.app/v1/options/chain/NVDA/?expiration=2026-07-17&side=call\")",
+      "Bash(curl -s \"http://localhost:62570/api/options?symbol=NVDA&mode=expirations\")",
+      "Bash(curl -s \"http://localhost:62570/api/options?symbol=NVDA&mode=chain&expiration=2026-07-17\")"
     ]
   }
 }
