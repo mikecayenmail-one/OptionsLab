@@ -53,10 +53,34 @@ function bsGreeks(S,K,T,r,sig,type){
    STRATEGIES
 ───────────────────────────────────────── */
 const STRATS = {
-  long_call:        {name:"Long Call",       tag:"Bullish", desc:"Buy a call — unlimited upside, risk limited to premium paid.",       accent:"#2563EB", tagBg:"#EFF6FF", tagC:"#1D4ED8", icon:"↗"},
-  long_put:         {name:"Long Put",        tag:"Bearish", desc:"Buy a put — profit as stock falls below the strike minus premium.",  accent:"#DC2626", tagBg:"#FEF2F2", tagC:"#B91C1C", icon:"↘"},
-  covered_call:     {name:"Covered Call",    tag:"Income",  desc:"Own shares + sell a call. Collect premium and cap your upside.",    accent:"#D97706", tagBg:"#FFFBEB", tagC:"#B45309", icon:"⇄"},
-  cash_secured_put: {name:"Cash-Secured Put",tag:"Income",  desc:"Sell a put backed by cash. Collect premium, risk is assignment.",   accent:"#7C3AED", tagBg:"#F5F3FF", tagC:"#6D28D9", icon:"⊝"},
+  long_call:        {name:"Long Call",       tag:"Bullish",      desc:"Buy a call — unlimited upside, risk limited to premium paid.",                                                        accent:"#2563EB", tagBg:"#EFF6FF", tagC:"#1D4ED8", icon:"↗"},
+  long_put:         {name:"Long Put",        tag:"Bearish",      desc:"Buy a put — profit as stock falls below the strike minus premium.",                                                   accent:"#DC2626", tagBg:"#FEF2F2", tagC:"#B91C1C", icon:"↘"},
+  covered_call:     {name:"Covered Call",    tag:"Income",       desc:"Own shares + sell a call. Collect premium and cap your upside.",                                                      accent:"#D97706", tagBg:"#FFFBEB", tagC:"#B45309", icon:"⇄"},
+  cash_secured_put: {name:"Cash-Secured Put",tag:"Income",       desc:"Sell a put backed by cash. Collect premium, risk is assignment.",                                                     accent:"#7C3AED", tagBg:"#F5F3FF", tagC:"#6D28D9", icon:"⊝"},
+  call_spread:      {name:"Call Spread",     tag:"Neutral/Bull", desc:"Buy a lower-strike call and sell a higher-strike call. Limited risk and reward — profits if stock rises moderately.", accent:"#0891B2", tagBg:"#ECFEFF", tagC:"#0E7490", icon:"⇕"},
+  put_spread:       {name:"Put Spread",      tag:"Neutral/Bear", desc:"Buy a higher-strike put and sell a lower-strike put. Limited risk spread — profits if stock falls moderately.",      accent:"#BE185D", tagBg:"#FDF2F8", tagC:"#9D174D", icon:"⇕"},
+  pmcc:             {name:"Poor Man's CC",   tag:"Income",       desc:"Buy a deep ITM LEAP call instead of 100 shares, then sell near-term calls against it to collect premium.",           accent:"#16A34A", tagBg:"#F0FDF4", tagC:"#15803D", icon:"⊞"},
+  calendar_spread:  {name:"Calendar Spread", tag:"Neutral",      desc:"Sell a short-dated option and buy a longer-dated option at the same strike. Profits from time decay differential.",  accent:"#9333EA", tagBg:"#FAF5FF", tagC:"#7E22CE", icon:"⊟"},
+};
+
+const MULTI_LEG=['call_spread','put_spread','pmcc','calendar_spread'];
+
+const LEG_LABELS={
+  call_spread:     ['Long Call','Short Call'],
+  put_spread:      ['Long Put','Short Put'],
+  pmcc:            ['LEAP Call','Short Call'],
+  calendar_spread: ['Back-Month','Front-Month'],
+};
+
+const LEG_INTENT={
+  long_call:      'Buy the right to purchase shares at the strike price before expiry. You risk only the premium paid, but gain if the stock rises above breakeven (strike + premium). Ideal when you expect a moderate to strong upward move.',
+  long_put:       'Buy the right to sell shares at the strike price before expiry. You risk only the premium paid, but profit if the stock falls below breakeven (strike − premium). Ideal when you expect a moderate to strong downward move.',
+  covered_call:   'Own the shares and sell someone the right to buy them at the strike. You collect the premium upfront and keep it if the stock stays below the strike at expiry — but your upside is capped there. Best for modest gains or flat markets.',
+  cash_secured_put:'Sell the right for someone to put shares to you at the strike. You collect the premium upfront; if the stock falls below the strike you are assigned shares at that price minus the premium — a way to get paid while waiting to buy a stock you want.',
+  call_spread:    'Pay a net debit for the right to profit if the stock rises to your short strike. Both risk and reward are capped — you keep the full spread width minus the debit if the stock closes above the short strike at expiry.',
+  put_spread:     'Pay a net debit for the right to profit if the stock falls to your short strike. Both risk and reward are capped — you keep the full spread width minus the debit if the stock closes below the short strike at expiry.',
+  pmcc:           'Use a deep ITM LEAP as a low-cost stock substitute, then sell a near-term call against it to collect premium. The goal is to repeatedly cover the cost of the LEAP while keeping exposure to an upward move.',
+  calendar_spread:'Sell a short-dated option and buy a longer-dated option at the same strike. You profit from the near-term contract decaying faster than the far-dated one — best when the stock stays near the strike through the front-month expiry.',
 };
 
 /* ─────────────────────────────────────────
@@ -66,8 +90,34 @@ function pnl(strat,p,S,days){
   const T=Math.max(days/365,0),n=p.contracts*100,sig=p.iv/100,r=p.rfr/100;
   if(strat==="long_call")       {const v=T<=0?Math.max(S-p.strike,0):bsPrice(S,p.strike,T,r,sig,"call");return(v-p.premium)*n;}
   if(strat==="long_put")        {const v=T<=0?Math.max(p.strike-S,0):bsPrice(S,p.strike,T,r,sig,"put"); return(v-p.premium)*n;}
-  if(strat==="covered_call")    {const v=T<=0?Math.max(S-p.strike,0):bsPrice(S,p.strike,T,r,sig,"call");return((S-p.stockPrice)+(p.premium-v))*n;}
+  if(strat==="covered_call")    {const v=T<=0?Math.max(S-p.strike,0):bsPrice(S,p.strike,T,r,sig,"call");const costBasis=p.purchasePrice??p.stockPrice;const sN=p.sharesOwned??n;const oN=n;return(S-costBasis)*sN+(p.premium-v)*oN;}
   if(strat==="cash_secured_put"){const v=T<=0?Math.max(p.strike-S,0):bsPrice(S,p.strike,T,r,sig,"put"); return(p.premium-v)*n;}
+  if(strat==="call_spread"){
+    const v1=T<=0?Math.max(S-p.strike,0):bsPrice(S,p.strike,T,r,sig,"call");
+    const v2=T<=0?Math.max(S-p.leg2Strike,0):bsPrice(S,p.leg2Strike,T,r,(p.leg2Iv?p.leg2Iv/100:sig),"call");
+    return(v1-p.premium+p.leg2Premium-v2)*n;
+  }
+  if(strat==="put_spread"){
+    const v1=T<=0?Math.max(p.strike-S,0):bsPrice(S,p.strike,T,r,sig,"put");
+    const v2=T<=0?Math.max(p.leg2Strike-S,0):bsPrice(S,p.leg2Strike,T,r,(p.leg2Iv?p.leg2Iv/100:sig),"put");
+    return(v1-p.premium+p.leg2Premium-v2)*n;
+  }
+  if(strat==="pmcc"){
+    const dteDiff=Math.max(0,(p.dte||30)-(p.leg2Dte||30));
+    const backT=Math.max((days+dteDiff)/365,0);
+    const frontT=Math.max(days/365,0);
+    const v1=backT<=0?Math.max(S-p.strike,0):bsPrice(S,p.strike,backT,r,sig,"call");
+    const v2=frontT<=0?Math.max(S-p.leg2Strike,0):bsPrice(S,p.leg2Strike,frontT,r,(p.leg2Iv?p.leg2Iv/100:sig),"call");
+    return(v1-p.premium+p.leg2Premium-v2)*n;
+  }
+  if(strat==="calendar_spread"){
+    const dteDiff=Math.max(0,(p.dte||30)-(p.leg2Dte||30));
+    const backT=Math.max((days+dteDiff)/365,0);
+    const frontT=Math.max(days/365,0);
+    const v1=backT<=0?Math.max(S-p.strike,0):bsPrice(S,p.strike,backT,r,sig,"call");
+    const v2=frontT<=0?Math.max(S-p.strike,0):bsPrice(S,p.strike,frontT,r,(p.leg2Iv?p.leg2Iv/100:sig),"call");
+    return(v1-p.premium+p.leg2Premium-v2)*n;
+  }
   return 0;
 }
 
@@ -234,6 +284,50 @@ const CSS=`
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2.2s ease-in-out infinite}
 .hdr-meta{font-size:12px;color:var(--t3);font-weight:500}
 .hdr-meta b{color:var(--blue);font-weight:600}
+.suggest-btn{
+  display:flex;align-items:center;gap:6px;padding:5px 13px;
+  border-radius:20px;background:var(--bg);border:1px solid var(--brd);
+  font-size:11px;font-weight:600;color:var(--t2);font-family:var(--sans);
+  cursor:pointer;transition:border-color var(--tr),color var(--tr),background var(--tr);
+  text-decoration:none;
+}
+.suggest-btn:hover{border-color:var(--blue);color:var(--blue);background:#EFF6FF}
+/* ── Suggestion section ── */
+.suggest-section{
+  margin:32px 40px 8px;padding:36px 40px;
+  border:1px solid var(--brd);border-radius:18px;
+  background:var(--white);
+}
+.suggest-section h2{font-size:20px;font-weight:700;color:var(--t1);margin:0 0 4px}
+.suggest-section p{font-size:13px;color:var(--t3);margin:0 0 24px}
+.suggest-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.suggest-field{display:flex;flex-direction:column;gap:6px}
+.suggest-field.full{grid-column:1/-1}
+.suggest-field label{font-size:11.5px;font-weight:600;color:var(--t3);letter-spacing:.03em;text-transform:uppercase}
+.suggest-field input,.suggest-field textarea{
+  padding:10px 14px;border:1px solid var(--brd);border-radius:10px;
+  font-size:13.5px;font-family:var(--sans);color:var(--t1);background:var(--bg);
+  outline:none;transition:border-color var(--tr),box-shadow var(--tr);resize:vertical;
+}
+.suggest-field input:focus,.suggest-field textarea:focus{
+  border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.08);
+}
+.suggest-field textarea{min-height:120px;line-height:1.6}
+.suggest-submit{
+  margin-top:20px;display:flex;align-items:center;gap:14px;
+}
+.suggest-submit button{
+  padding:10px 28px;border-radius:10px;border:none;cursor:pointer;
+  background:var(--blue);color:#fff;font-size:13.5px;font-weight:600;
+  font-family:var(--sans);transition:opacity var(--tr),transform var(--tr);
+}
+.suggest-submit button:hover{opacity:.88;transform:translateY(-1px)}
+.suggest-submit button:active{transform:translateY(0)}
+.suggest-note{font-size:11.5px;color:var(--t4)}
+@media(max-width:640px){
+  .suggest-grid{grid-template-columns:1fr}
+  .suggest-section{margin:24px 16px 8px;padding:24px 20px}
+}
 
 /* ── Page ── */
 .page{max-width:1360px;margin:0 auto;padding:28px 40px;display:grid;grid-template-columns:298px 1fr;gap:22px;align-items:start}
@@ -285,15 +379,16 @@ const CSS=`
 .strat-bar{
   background:var(--white);border-bottom:1px solid var(--brd);
   padding:0 40px;display:flex;align-items:stretch;gap:0;
-  box-shadow:0 1px 4px rgba(0,0,0,.04);
+  box-shadow:0 1px 4px rgba(0,0,0,.04);flex-wrap:wrap;
 }
 .sbtn{
   display:flex;align-items:center;gap:9px;
   padding:13px 20px;border:none;border-bottom:2.5px solid transparent;
   background:transparent;cursor:pointer;text-align:left;
-  transition:all var(--tr);flex:1;justify-content:center;
+  transition:all var(--tr);flex:1 1 25%;min-width:140px;justify-content:center;
   border-radius:0;
 }
+.sbtn:nth-child(n+5){border-top:1px solid var(--brd);}
 .sbtn:hover{background:var(--bg)}
 .sbtn.active{border-bottom-color:currentColor;background:var(--bg)}
 .stag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
@@ -331,7 +426,7 @@ const CSS=`
 .mc:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
 .mc-bar{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px}
 .mc-label{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-bottom:8px;padding-left:12px}
-.mc-val{font-size:24px;font-weight:700;font-family:var(--mono);letter-spacing:-.03em;font-feature-settings:"tnum" 1;padding-left:12px}
+.mc-val{font-size:clamp(13px,1.58vw,19px);font-weight:700;font-family:var(--mono);letter-spacing:-.03em;font-feature-settings:"tnum" 1;padding:0 10px 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mc-sub{font-size:11px;color:var(--t3);margin-top:4px;padding-left:12px}
 
 /* ── Greeks ── */
@@ -644,7 +739,7 @@ const CSS=`
 
   /* Metrics: 2 columns */
   .metrics{grid-template-columns:repeat(2,1fr);gap:10px}
-  .mc-val{font-size:20px}
+  .mc-val{font-size:clamp(12px,3.2vw,17px)}
 
   /* Greeks: 3 columns */
   .greeks{grid-template-columns:repeat(3,1fr)}
@@ -729,7 +824,73 @@ const CSS=`
 /* ─────────────────────────────────────────
    STOCK SEARCH
 ───────────────────────────────────────── */
-function StockSearch({onSelect,selected,onCall}){
+function ChartModal({symbol,onClose}){
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(!ref.current||!symbol)return;
+    ref.current.innerHTML='';
+    const script=document.createElement('script');
+    script.src='https://s3.tradingview.com/tv.js';
+    script.async=true;
+    script.onload=()=>{
+      if(window.TradingView){
+        new window.TradingView.widget({
+          container_id:'tv-chart-container',
+          symbol:symbol,
+          interval:'D',
+          timezone:'America/New_York',
+          theme:'light',
+          style:'1',
+          locale:'en',
+          toolbar_bg:'#f1f3f6',
+          enable_publishing:false,
+          allow_symbol_change:false,
+          hide_side_toolbar:false,
+          width:'100%',
+          height:650,
+          studies:['RSI@tv-studiescript','MACD@tv-studiescript'],
+        });
+      }
+    };
+    document.head.appendChild(script);
+    return()=>{
+      // cleanup script tag if already loaded
+      const existing=document.querySelector('script[src="https://s3.tradingview.com/tv.js"]');
+      if(existing)existing.remove();
+    };
+  },[symbol]);
+
+  // Close on backdrop click
+  function onBackdrop(e){if(e.target===e.currentTarget)onClose();}
+
+  return(
+    <div onClick={onBackdrop} style={{
+      position:'fixed',inset:0,zIndex:600,background:'rgba(15,23,42,.55)',
+      display:'flex',alignItems:'center',justifyContent:'center',
+      backdropFilter:'blur(3px)',padding:'20px'
+    }}>
+      <div style={{background:'var(--white)',borderRadius:16,width:'min(1125px,100%)',
+        boxShadow:'0 24px 64px rgba(0,0,0,.18)',overflow:'hidden',display:'flex',flexDirection:'column'}}>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'14px 20px',borderBottom:'1px solid var(--brd)'}}>
+          <div style={{fontWeight:700,fontSize:15,color:'var(--t1)'}}>
+            <span style={{fontFamily:'var(--mono)',color:'var(--blue)'}}>{symbol}</span>
+            {" "}— Interactive Chart
+          </div>
+          <button onClick={onClose} style={{
+            background:'none',border:'none',cursor:'pointer',color:'var(--t3)',
+            fontSize:20,lineHeight:1,padding:'2px 6px',borderRadius:6
+          }}>✕</button>
+        </div>
+        {/* Chart */}
+        <div id="tv-chart-container" ref={ref} style={{width:'100%',minHeight:650}}/>
+      </div>
+    </div>
+  );
+}
+
+function StockSearch({onSelect,selected,onCall,onChart}){
   const{sr,sl,search,quote,ql,qe}=useFinnhub({onCall});
   const[nameQ,setNameQ]=useState("");
   const[tickerQ,setTickerQ]=useState("");
@@ -818,13 +979,35 @@ function StockSearch({onSelect,selected,onCall}){
           </div>
           {/* Row 3: OHLC wraps */}
           <div style={{display:"flex",flexWrap:"wrap",gap:"4px 14px",marginTop:8}}>
-            {[["O",selected.open],["H",selected.high],["L",selected.low],["PC",selected.prevClose]].map(([l,v])=>(
+            {[["O",selected.open],["H",selected.high],["L",selected.low],["Prior Close",selected.prevClose]].map(([l,v])=>(
               <div key={l} style={{fontSize:10.5,color:"var(--t3)"}}>
                 {l}{" "}<span style={{fontFamily:"var(--mono)",fontWeight:600,color:"var(--t2)"}}>${v?.toFixed(2)}</span>
               </div>
             ))}
           </div>
+          {(selected.week52High||selected.week52Low)&&(
+            <div style={{display:"flex",gap:14,marginTop:7,flexWrap:"wrap"}}>
+              {selected.week52High&&<div style={{fontSize:10.5,color:"var(--t3)"}}>52W H{" "}<span style={{fontFamily:"var(--mono)",fontWeight:600,color:"var(--green)"}}>${selected.week52High.toFixed(2)}</span></div>}
+              {selected.week52Low&&<div style={{fontSize:10.5,color:"var(--t3)"}}>52W L{" "}<span style={{fontFamily:"var(--mono)",fontWeight:600,color:"var(--red)"}}>${selected.week52Low.toFixed(2)}</span></div>}
+            </div>
+          )}
           {selected.industry&&<div style={{marginTop:6,fontSize:10.5,color:"var(--t3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selected.industry}{selected.cap?` · $${(selected.cap/1000).toFixed(1)}B cap`:""}</div>}
+          <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}>
+            <button onClick={()=>onChart&&onChart(selected.symbol)} style={{
+              display:"flex",alignItems:"center",gap:5,padding:"5px 13px",
+              borderRadius:8,border:"1px solid var(--blue-brd)",background:"var(--white)",
+              color:"var(--blue)",fontSize:11.5,fontWeight:600,cursor:"pointer",
+              fontFamily:"var(--sans)",transition:"background var(--tr),box-shadow var(--tr)"
+            }}
+            onMouseOver={e=>e.currentTarget.style.background="var(--blue-bg)"}
+            onMouseOut={e=>e.currentTarget.style.background="var(--white)"}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              Chart
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -881,6 +1064,26 @@ function PInput({label,value,onChange,prefix,suffix,step=1,min=0}){
           step={step} min={min}
           style={{paddingLeft:prefix?25:12,paddingRight:suffix?40:12}}/>
         {suffix&&<span className="inp-sfx">{suffix}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   COMPACT FIELD (used in strategy cards)
+─────────────────────────────────────────── */
+function CField({label,value,onChange,prefix,suffix,step=1,min=0,readOnly,disabled}){
+  const sm={padding:'6px 10px',fontSize:12.5};
+  return(
+    <div className="field">
+      <label className="flabel" style={{fontSize:9.5}}>{label}</label>
+      <div className="inp-wrap">
+        {prefix&&<span className="inp-pfx">{prefix}</span>}
+        <input type="number" className="inp" value={value}
+          onChange={e=>onChange&&onChange(parseFloat(e.target.value)||0)}
+          step={step} min={min} readOnly={readOnly} disabled={disabled}
+          style={{...sm,paddingLeft:prefix?22:10,paddingRight:suffix?(suffix.length>1?38:28):10}}/>
+        {suffix&&<span className="inp-sfx" style={{fontSize:10}}>{suffix}</span>}
       </div>
     </div>
   );
@@ -1132,11 +1335,16 @@ const STRATEGY_META={
   long_put:         {label:'Long Put',         side:'put', buying:true },
   covered_call:     {label:'Covered Call',     side:'call',buying:false},
   cash_secured_put: {label:'Cash-Secured Put', side:'put', buying:false},
+  call_spread:      {label:'Call Spread',      side:'call',buying:true },
+  put_spread:       {label:'Put Spread',       side:'put', buying:true },
+  pmcc:             {label:"Poor Man's CC",    side:'call',buying:true },
+  calendar_spread:  {label:'Calendar Spread',  side:'call',buying:true },
 };
 
-function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall,strategy}){
+function OptionsChainModal({symbol,stockPrice,onSelect,onClose,onCall,strategy,legBuying}){
   const meta=STRATEGY_META[strategy]||{label:'',side:'call',buying:true};
-  const{label:strategyLabel,side:relevantSide,buying}=meta;
+  const buying=legBuying!==undefined?legBuying:meta.buying;
+  const{label:strategyLabel,side:relevantSide}=meta;
 
   // Per-column class helpers
   const subHdr=(side,col)=>{
@@ -1414,12 +1622,68 @@ function deriveStrategy(action, side){
 /* ─────────────────────────────────────────
    MAIN APP
 ───────────────────────────────────────── */
+const SUGGEST_EMAIL = 'your@email.com'; // TODO: replace with your address
+
+function SuggestionSection(){
+  const[email,setEmail]=React.useState('');
+  const[title,setTitle]=React.useState('');
+  const[body,setBody]=React.useState('');
+  const[sent,setSent]=React.useState(false);
+
+  function handleSubmit(e){
+    e.preventDefault();
+    if(!title.trim()||!body.trim())return;
+    const subject=encodeURIComponent(`[OptionsLab Suggestion] ${title.trim()}`);
+    const bodyText=encodeURIComponent(
+      `${email?`From: ${email}\n\n`:''}${body.trim()}`
+    );
+    window.location.href=`mailto:${SUGGEST_EMAIL}?subject=${subject}&body=${bodyText}`;
+    setSent(true);
+    setTimeout(()=>setSent(false),4000);
+  }
+
+  return(
+    <section className="suggest-section" id="suggest">
+      <h2>Suggest a feature or other requests</h2>
+      <p>Have an idea to improve OptionsLab? Share it below and I'll review every submission.</p>
+      <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 16px',borderRadius:10,background:'#EFF6FF',border:'1px solid #BFDBFE',marginBottom:8}}>
+        <span style={{fontSize:16,flexShrink:0,marginTop:1}}>🔔</span>
+        <span style={{fontSize:12.5,color:'#1D4ED8',lineHeight:1.6}}>
+          <b>Note:</b> Suggestions are ranked by frequency of request — the most-requested features move to the top of the list. That said, the site is actively being updated with major functionality expansions, so your idea may already be in progress!
+        </span>
+      </div>
+      <form onSubmit={handleSubmit}>
+        <div className="suggest-grid">
+          <div className="suggest-field">
+            <label>Your Email <span style={{fontWeight:400,textTransform:'none',color:'var(--t4)'}}>(optional)</span></label>
+            <input type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)}/>
+          </div>
+          <div className="suggest-field">
+            <label>Title / Subject</label>
+            <input type="text" placeholder="e.g. Add Iron Condor strategy" value={title} onChange={e=>setTitle(e.target.value)} required/>
+          </div>
+          <div className="suggest-field full">
+            <label>Your Suggestion</label>
+            <textarea placeholder="Suggest a feature or other requests" value={body} onChange={e=>setBody(e.target.value)} required/>
+          </div>
+        </div>
+        <div className="suggest-submit">
+          <button type="submit">{sent?'Opening email…':'Send Suggestion'}</button>
+          <span className="suggest-note">Opens your email client pre-filled — no data is stored here.</span>
+        </div>
+      </form>
+    </section>
+  );
+}
+
 function OptionsLab(){
   const[strategy,setStrategy]=useState("long_put");
   const[selected,setSelected]=useState(null);
   const[strike,setStrike]=useState(170);
   const[premium,setPremium]=useState(3.50);
   const[contracts,setContracts]=useState(1);
+  const[sharesOwned,setSharesOwned]=useState(100);
+  const[purchasePrice,setPurchasePrice]=useState(0);
   const[dte,setDte]=useState(30);
   const[iv,setIv]=useState(30);
   const[ivBase,setIvBase]=useState(30);
@@ -1430,8 +1694,17 @@ function OptionsLab(){
   const[priceRangeManual,setPriceRangeManual]=useState(false);
   const[chartView,setChartView]=useState("chart");
   const[showOptionsModal,setShowOptionsModal]=useState(false);
+  const[chartSymbol,setChartSymbol]=useState(null);
   const[selectedContract,setSelectedContract]=useState(null);
   const[contractAction,setContractAction]=useState('buy'); // 'buy' | 'write'
+
+  // Multi-leg state
+  const[leg2Strike,setLeg2Strike]=useState(185);
+  const[leg2Premium,setLeg2Premium]=useState(1.50);
+  const[leg2Dte,setLeg2Dte]=useState(30);
+  const[leg2Iv,setLeg2Iv]=useState(30);
+  const[selectingLeg,setSelectingLeg]=useState(1);
+  const[selectedContract2,setSelectedContract2]=useState(null);
 
   // Auto price range when strategy, stock price, or strike changes (if not manually overridden)
   const sp=selected?.price||0;
@@ -1442,13 +1715,39 @@ function OptionsLab(){
     setPriceHigh(high);
   },[sp,strategy,strike,priceRangeManual]);
 
+  // Calendar spread: lock leg2 strike to leg1 strike
+  useEffect(()=>{
+    if(strategy==='calendar_spread') setLeg2Strike(strike);
+  },[strategy,strike]);
+
   // Sync strategy when selected contract changes (e.g. after picking from chain)
+  // Skip for multi-leg strategies — leg selection must not override the parent strategy
   useEffect(()=>{
     if(!selectedContract) return;
+    if(MULTI_LEG.includes(strategy)) return;
     setStrategy(deriveStrategy(contractAction, selectedContract.side));
-  },[selectedContract]);
+  },[selectedContract, strategy]);
 
   const handleOptionSelect=useCallback((opt)=>{
+    if(MULTI_LEG.includes(strategy)){
+      if(selectingLeg===1){
+        setStrike(opt.strike);
+        const mktPrice=parseFloat((opt.mid??opt.ask??0).toFixed(2));
+        setPremium(mktPrice);
+        setDte(opt.dte??30);
+        if(opt.iv&&opt.iv>0.005){const r=Math.round(opt.iv*100*10)/10;setIv(r);setIvBase(r);}
+        setSelectedContract(opt);
+      } else {
+        if(strategy!=='calendar_spread') setLeg2Strike(opt.strike);
+        const mktPrice=parseFloat((opt.mid??opt.ask??0).toFixed(2));
+        setLeg2Premium(mktPrice);
+        setLeg2Dte(opt.dte??30);
+        if(opt.iv&&opt.iv>0.005){const r=Math.round(opt.iv*100*10)/10;setLeg2Iv(r);}
+        setSelectedContract2(opt);
+      }
+      setShowOptionsModal(false);
+      return;
+    }
     const derived=deriveStrategy(contractAction, opt.side);
     setStrategy(derived);
     setStrike(opt.strike);
@@ -1477,7 +1776,7 @@ function OptionsLab(){
       setPriceHigh(high);
       setPriceRangeManual(false);
     }
-  },[contractAction, sp, rfr]);
+  },[contractAction, selectingLeg, strategy, sp, rfr]);
 
   // API call tracking
   const tracker=useCallTracker();
@@ -1509,28 +1808,50 @@ function OptionsLab(){
   },[tracker.status,tracker.count]);
 
   const st=STRATS[strategy];
-  const params={strike,premium,contracts,stockPrice:sp,iv,rfr};
+  const params={strike,premium,contracts,sharesOwned,stockPrice:sp,purchasePrice:purchasePrice||sp,iv,rfr,
+    leg2Strike,leg2Premium,leg2Iv,leg2Dte,dte};
   const n=contracts*100;
 
   const summary=useMemo(()=>{
     if(!sp)return null;
     let mp,ml,be;
-    if(strategy==="long_call")       {mp="∞";ml=(premium*n).toFixed(2);be=(strike+premium).toFixed(2);}
-    else if(strategy==="long_put")   {mp=((strike-premium)*n).toFixed(2);ml=(premium*n).toFixed(2);be=(strike-premium).toFixed(2);}
-    else if(strategy==="covered_call"){mp=((strike-sp+premium)*n).toFixed(2);ml=((sp-premium)*n).toFixed(2);be=(sp-premium).toFixed(2);}
-    else                             {mp=(premium*n).toFixed(2);ml=((strike-premium)*n).toFixed(2);be=(strike-premium).toFixed(2);}
+    if(strategy==="long_call")          {mp="∞";ml=(premium*n).toFixed(2);be=(strike+premium).toFixed(2);}
+    else if(strategy==="long_put")      {mp=((strike-premium)*n).toFixed(2);ml=(premium*n).toFixed(2);be=(strike-premium).toFixed(2);}
+    else if(strategy==="covered_call")  {const cb=purchasePrice||sp;mp=((strike-cb+premium)*n).toFixed(2);ml=((cb-premium)*n).toFixed(2);be=(cb-premium).toFixed(2);}
+    else if(strategy==="cash_secured_put"){mp=(premium*n).toFixed(2);ml=((strike-premium)*n).toFixed(2);be=(strike-premium).toFixed(2);}
+    else if(strategy==="call_spread")   {const nd=premium-leg2Premium;mp=((leg2Strike-strike-nd)*n).toFixed(2);ml=(nd*n).toFixed(2);be=(strike+nd).toFixed(2);}
+    else if(strategy==="put_spread")    {const nd=premium-leg2Premium;mp=((strike-leg2Strike-nd)*n).toFixed(2);ml=(nd*n).toFixed(2);be=(strike-nd).toFixed(2);}
+    else if(strategy==="pmcc")          {const nd=premium-leg2Premium;mp=((leg2Strike-strike)*n).toFixed(2);ml=(nd*n).toFixed(2);be=(strike+nd).toFixed(2);}
+    else if(strategy==="calendar_spread"){const nd=premium-leg2Premium;mp="varies";ml=(Math.max(nd,0)*n).toFixed(2);be="≈strike";}
+    else                                {mp="0";ml="0";be="0";}
     return{mp,ml,be,cur:pnl(strategy,params,sp,dte)};
-  },[strategy,sp,strike,premium,n,dte,params]);
+  },[strategy,sp,strike,premium,n,dte,params,purchasePrice,leg2Strike,leg2Premium]);
 
   const greeks=useMemo(()=>{
     if(!sp)return null;
-    return bsGreeks(sp,strike,dte/365,rfr/100,iv/100,strategy.includes("call")?"call":"put");
-  },[sp,strike,dte,iv,rfr,strategy]);
+    const isML=MULTI_LEG.includes(strategy);
+    if(!isML){
+      return bsGreeks(sp,strike,dte/365,rfr/100,iv/100,strategy.includes("call")?"call":"put");
+    }
+    // Multi-leg: sum greeks of both legs (long leg1, short leg2)
+    const side1=strategy==='put_spread'?'put':'call';
+    const side2=strategy==='put_spread'?'put':'call';
+    const g1=bsGreeks(sp,strike,dte/365,rfr/100,iv/100,side1);
+    const leg2T=(strategy==='calendar_spread'||strategy==='pmcc')?Math.max((dte+(dte-leg2Dte))/365,0):dte/365;
+    const g2=bsGreeks(sp,leg2Strike,leg2T,rfr/100,(leg2Iv||iv)/100,side2);
+    return{
+      delta:g1.delta-g2.delta,
+      gamma:g1.gamma-g2.gamma,
+      theta:g1.theta-g2.theta,
+      vega:g1.vega-g2.vega,
+      rho:g1.rho-g2.rho,
+    };
+  },[sp,strategy,strike,leg2Strike,dte,leg2Dte,iv,leg2Iv,rfr]);
 
   const metrics=summary?[
-    {label:"Max Profit", val:summary.mp==="∞"?"∞":`$${summary.mp}`, color:"var(--green)", bar:"var(--green)", sub:"Best case at expiry"},
-    {label:"Max Loss",   val:`-$${summary.ml}`,                      color:"var(--red)",   bar:"var(--red)",   sub:`Premium paid · ${contracts} contract${contracts!==1?"s":""}`},
-    {label:"Breakeven",  val:`$${summary.be}`,                       color:"var(--amber)", bar:"var(--amber)", sub:"At expiry only — not before"},
+    {label:"Max Profit", val:summary.mp==="∞"?"∞":summary.mp==="varies"?"varies":`$${summary.mp}`, color:"var(--green)", bar:"var(--green)", sub:"Best case at expiry"},
+    {label:"Max Loss",   val:summary.ml==="varies"?"varies":`-$${summary.ml}`,                      color:"var(--red)",   bar:"var(--red)",   sub:(strategy==="covered_call"||strategy==="cash_secured_put")?`Stock falls to zero · ${contracts} contract${contracts!==1?"s":""}`:MULTI_LEG.includes(strategy)?`Net debit · ${contracts} contract${contracts!==1?"s":""}`:`Premium paid · ${contracts} contract${contracts!==1?"s":""}`},
+    {label:"Breakeven",  val:summary.be==="≈strike"?"≈strike":`$${summary.be}`,                    color:"var(--amber)", bar:"var(--amber)", sub:"At expiry only — not before"},
     {label:"Current P&L",val:`${summary.cur>=0?"+":""}$${Math.abs(summary.cur).toFixed(2)}`,
       color:summary.cur>=0?"var(--green)":"var(--red)",
       bar:summary.cur>=0?"var(--green)":"var(--red)",
@@ -1560,6 +1881,9 @@ function OptionsLab(){
         </div>
         <div className="hdr-right">
           <div className="live-pill"><div className="live-dot"/>Live Data</div>
+          <a href="#suggest" className="suggest-btn" onClick={e=>{e.preventDefault();document.getElementById('suggest').scrollIntoView({behavior:'smooth'})}}>
+            ✉ Suggest a Feature
+          </a>
           {/* API call counter */}
           <div className={`call-counter${tracker.status==='warn'?' warn':tracker.status==='over'?' over':''}`}
             title={`${tracker.count} of ${tracker.limit} API calls used today. Resets at midnight.\nLast: ${tracker.history.length?new Date(tracker.history[tracker.history.length-1].time).toLocaleTimeString():'—'}`}>
@@ -1585,11 +1909,14 @@ function OptionsLab(){
       <ToastStack toasts={toasts} onDismiss={id=>setToasts(t=>t.filter(x=>x.id!==id))}/>
 
       {/* Options chain modal */}
+      {chartSymbol&&<ChartModal symbol={chartSymbol} onClose={()=>setChartSymbol(null)}/>}
+
       {showOptionsModal&&selected&&(
         <OptionsChainModal
           symbol={selected.symbol}
           stockPrice={selected.price}
           strategy={strategy}
+          legBuying={MULTI_LEG.includes(strategy)?selectingLeg===1:undefined}
           onSelect={handleOptionSelect}
           onClose={()=>setShowOptionsModal(false)}
           onCall={handleApiCall}/>
@@ -1606,6 +1933,8 @@ function OptionsLab(){
                 setContractAction(['covered_call','cash_secured_put'].includes(k)?'write':'buy');
                 setPriceRangeManual(false);
                 setSelectedContract(null);
+                setSelectedContract2(null);
+                setSelectingLeg(1);
               }}
               style={{color:active?s.accent:'var(--t3)'}}>
               <span style={{fontSize:16}}>{s.icon}</span>
@@ -1630,6 +1959,7 @@ function OptionsLab(){
             onSelect={s=>{
               setSelected(s);
               setStrike(Math.round(s.price*.95));
+              setPurchasePrice(s.price);
               const{low,high}=autoRange(s.price,strategy);
               setPriceLow(low);
               setPriceHigh(high);
@@ -1650,71 +1980,267 @@ function OptionsLab(){
                 .finally(()=>setIvLoading(false));
             }}
             selected={selected}
-            onCall={handleApiCall}/>
+            onCall={handleApiCall}
+            onChart={sym=>setChartSymbol(sym)}/>
 
-          {/* Options contract selector */}
-          {selected&&(
-            <div className="card cp fu1">
-              <div className="slabel">Option Contract</div>
-
-              {/* Buy / Write toggle */}
-              <div className="field" style={{marginBottom:10}}>
-                <label className="flabel">Position Type</label>
-                <select
-                  value={contractAction}
-                  onChange={e=>{
-                    const newAction=e.target.value;
-                    setContractAction(newAction);
-                    // Derive side from current strategy (call vs put), then flip buy/write
-                    const currentSide=STRATEGY_META[strategy]?.side||'call';
-                    setStrategy(deriveStrategy(newAction,currentSide));
-                    setPriceRangeManual(false);
-                  }}
-                  style={{
-                    width:'100%',padding:'9px 12px',borderRadius:8,
-                    border:'1.5px solid var(--brd)',background:'var(--white)',
-                    color:'var(--t1)',fontFamily:'var(--font)',fontSize:13,
-                    fontWeight:600,cursor:'pointer',outline:'none',
-                  }}>
-                  <option value="buy">Buy (Long)</option>
-                  <option value="write">Write (Short / Sell)</option>
-                </select>
-                <div style={{fontSize:10.5,color:'var(--t3)',marginTop:4}}>
-                  {contractAction==='buy'
-                    ?'Buying the option — limited risk, unlimited potential'
-                    :'Selling the option — collect premium, capped profit'}
+          {/* Long Call / Long Put / Cash-Secured Put — compact card */}
+          {selected&&(strategy==='long_call'||strategy==='long_put'||strategy==='cash_secured_put')&&(()=>{
+            const st=STRATS[strategy];
+            const isBuy=strategy!=='cash_secured_put';
+            const optLabel=strategy==='long_call'?'Call Option':'Put Option';
+            const chainSVG=<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>;
+            return(
+              <div className="card fu1" style={{overflow:'hidden'}}>
+                <div style={{padding:'10px 15px 9px',borderBottom:'1px solid var(--brd)',background:st.tagBg}}>
+                  <div style={{display:'flex',alignItems:'center',gap:7}}>
+                    <span style={{fontSize:14,lineHeight:1}}>{st.icon}</span>
+                    <span style={{fontSize:12.5,fontWeight:700,color:st.accent,letterSpacing:'-.01em'}}>{st.name}</span>
+                    <span style={{marginLeft:'auto',fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',padding:'2px 7px',borderRadius:4,background:'rgba(0,0,0,.06)',color:st.tagC}}>{st.tag}</span>
+                  </div>
+                  <p style={{margin:'5px 0 0',fontSize:11,color:'var(--t2)',lineHeight:1.5}}>{LEG_INTENT[strategy]}</p>
+                </div>
+                <div style={{padding:'13px 15px'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:6}}>
+                    <span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t2)'}}>{optLabel}</span>
+                    <span style={{fontSize:8,fontWeight:800,padding:'1px 5px',borderRadius:3,
+                      background:isBuy?'var(--blue-bg)':'var(--red-bg)',
+                      color:isBuy?'var(--blue)':'var(--red)',
+                      border:`1px solid ${isBuy?'var(--blue-brd)':'var(--red-brd)'}`,
+                      textTransform:'uppercase',letterSpacing:'.05em'}}>{isBuy?'BUY':'SELL'}</span>
+                  </div>
+                  <button className="opt-select-btn" style={{marginTop:0,padding:'5px 10px',fontSize:11,whiteSpace:'nowrap'}} onClick={()=>setShowOptionsModal(true)}>
+                    {chainSVG}{selectedContract?'Change':'Select Option'}
+                  </button>
+                  <ContractBadge contract={selectedContract} onClear={()=>setSelectedContract(null)}/>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:8}}>
+                    <CField label="Strike" value={strike} onChange={setStrike} prefix="$" step={.5}/>
+                    <CField label="Premium" value={premium} onChange={setPremium} prefix="$" step={.05}/>
+                  </div>
+                  <div style={{borderTop:'1px solid var(--brd)',marginTop:12,paddingTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <CField label="DTE" value={dte} onChange={setDte} suffix="days" step={1} min={0}/>
+                    <CField label="IV" value={iv} onChange={setIv} suffix="%" step={0.1} min={0.1}/>
+                  </div>
                 </div>
               </div>
+            );
+          })()}
 
-              <button className="opt-select-btn" onClick={()=>setShowOptionsModal(true)}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
-                </svg>
-                {selectedContract?'Change Contract':'Select from Options Chain'}
-              </button>
-              <ContractBadge contract={selectedContract} onClear={()=>{setSelectedContract(null);}}/>
-            </div>
-          )}
+          {/* Covered Call — two-column: stock ownership + short call */}
+          {selected&&strategy==='covered_call'&&(()=>{
+            const st=STRATS.covered_call;
+            const chainSVG=<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>;
+            return(
+              <div className="card fu1" style={{overflow:'hidden'}}>
+                <div style={{padding:'10px 15px 9px',borderBottom:'1px solid var(--brd)',background:st.tagBg}}>
+                  <div style={{display:'flex',alignItems:'center',gap:7}}>
+                    <span style={{fontSize:14,lineHeight:1}}>{st.icon}</span>
+                    <span style={{fontSize:12.5,fontWeight:700,color:st.accent,letterSpacing:'-.01em'}}>{st.name}</span>
+                    <span style={{marginLeft:'auto',fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',padding:'2px 7px',borderRadius:4,background:'rgba(0,0,0,.06)',color:st.tagC}}>{st.tag}</span>
+                  </div>
+                  <p style={{margin:'5px 0 0',fontSize:11,color:'var(--t2)',lineHeight:1.5}}>{LEG_INTENT.covered_call}</p>
+                </div>
+                <div style={{padding:'13px 15px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 14px'}}>
+                    {/* Left: stock ownership */}
+                    <div>
+                      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:6}}>
+                        <span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t2)'}}>Shares Owned</span>
+                        <span style={{fontSize:8,fontWeight:800,padding:'1px 5px',borderRadius:3,background:'var(--green-bg)',color:'var(--green)',border:'1px solid var(--green-brd)',textTransform:'uppercase',letterSpacing:'.05em'}}>LONG</span>
+                      </div>
+                      <CField label="Purchase Price" value={purchasePrice} onChange={setPurchasePrice} prefix="$" step={.01}/>
+                      <div className="field" style={{marginTop:6}}>
+                        <label className="flabel" style={{fontSize:9.5}}>Shares Owned</label>
+                        <div className="inp-wrap">
+                          <span className="inp-pfx">#</span>
+                          <input type="number" className="inp" value={sharesOwned} min={1} step={1}
+                            onChange={e=>{const v=Math.max(1,parseInt(e.target.value)||1);setSharesOwned(v);setContracts(Math.max(1,Math.floor(v/100)));}}
+                            style={{padding:'6px 10px',fontSize:12.5,paddingLeft:22}}/>
+                        </div>
+                        <div style={{fontSize:9,color:'var(--t4)',marginTop:2}}>1 Contract = 100 Shares</div>
+                      </div>
+                      {purchasePrice>0&&sp>0&&(
+                        <div style={{marginTop:7,fontSize:11,fontFamily:'var(--mono)',padding:'5px 8px',borderRadius:6,
+                          background:sp>=purchasePrice?'var(--green-bg)':'var(--red-bg)',
+                          border:`1px solid ${sp>=purchasePrice?'var(--green-brd)':'var(--red-brd)'}`,
+                          color:sp>=purchasePrice?'var(--green)':'var(--red)',fontWeight:600}}>
+                          {sp>=purchasePrice?'+':''}{((sp-purchasePrice)*sharesOwned).toFixed(2)} ({sp>=purchasePrice?'+':''}{((sp/purchasePrice-1)*100).toFixed(1)}%)
+                        </div>
+                      )}
+                    </div>
+                    {/* Right: short call */}
+                    <div style={{borderLeft:'1px solid var(--brd)',paddingLeft:14}}>
+                      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:6}}>
+                        <span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t2)'}}>Short Call</span>
+                        <span style={{fontSize:8,fontWeight:800,padding:'1px 5px',borderRadius:3,background:'var(--red-bg)',color:'var(--red)',border:'1px solid var(--red-brd)',textTransform:'uppercase',letterSpacing:'.05em'}}>SELL</span>
+                      </div>
+                      <button className="opt-select-btn" style={{marginTop:0,padding:'5px 10px',fontSize:11,whiteSpace:'nowrap'}} onClick={()=>setShowOptionsModal(true)}>
+                        {chainSVG}{selectedContract?'Change':'Select Option'}
+                      </button>
+                      <ContractBadge contract={selectedContract} onClear={()=>setSelectedContract(null)}/>
+                      <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:7}}>
+                        <CField label="Strike" value={strike} onChange={setStrike} prefix="$" step={.5}/>
+                        <CField label="Premium" value={premium} onChange={setPremium} prefix="$" step={.05}/>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{borderTop:'1px solid var(--brd)',marginTop:12,paddingTop:10,display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <CField label="DTE" value={dte} onChange={setDte} suffix="days" step={1} min={0}/>
+                    <CField label="IV" value={iv} onChange={setIv} suffix="%" step={0.1} min={0.1}/>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Multi-leg: Combined compact card */}
+          {selected&&MULTI_LEG.includes(strategy)&&(()=>{
+            const dualDte=strategy==='pmcc'||strategy==='calendar_spread';
+            const inpSm={padding:'6px 10px',fontSize:12.5};
+            const leg=(label,isBuy,selectBtn,badge,strikeVal,strikeSet,premVal,premSet,disabled)=>(
+              <div>
+                <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:6}}>
+                  <span style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--t2)'}}>{label}</span>
+                  <span style={{fontSize:8,fontWeight:800,padding:'1px 5px',borderRadius:3,
+                    background:isBuy?'var(--blue-bg)':'var(--red-bg)',
+                    color:isBuy?'var(--blue)':'var(--red)',
+                    border:`1px solid ${isBuy?'var(--blue-brd)':'var(--red-brd)'}`,
+                    textTransform:'uppercase',letterSpacing:'.05em'}}>{isBuy?'BUY':'SELL'}</span>
+                </div>
+                <button className="opt-select-btn" style={{marginTop:0,padding:'5px 10px',fontSize:11,whiteSpace:'nowrap'}} onClick={selectBtn}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+                  </svg>
+                  {badge?'Change':'Select'}
+                </button>
+                {badge}
+                <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:7}}>
+                  <div className="field">
+                    <label className="flabel" style={{fontSize:9.5}}>Strike</label>
+                    <div className="inp-wrap">
+                      <span className="inp-pfx">$</span>
+                      <input type="number" className="inp" value={strikeVal} step={.5}
+                        style={{...inpSm,paddingLeft:22}} disabled={disabled}
+                        onChange={e=>strikeSet(parseFloat(e.target.value)||0)}/>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label className="flabel" style={{fontSize:9.5}}>Premium</label>
+                    <div className="inp-wrap">
+                      <span className="inp-pfx">$</span>
+                      <input type="number" className="inp" value={premVal} step={.05} min={0}
+                        style={{...inpSm,paddingLeft:22}}
+                        onChange={e=>premSet(parseFloat(e.target.value)||0)}/>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+            const st=STRATS[strategy];
+            return(
+              <div className="card fu1" style={{overflow:'hidden'}}>
+                {/* Title bar */}
+                <div style={{padding:'10px 15px 9px',borderBottom:'1px solid var(--brd)',background:st.tagBg}}>
+                  <div style={{display:'flex',alignItems:'center',gap:7}}>
+                    <span style={{fontSize:14,lineHeight:1}}>{st.icon}</span>
+                    <span style={{fontSize:12.5,fontWeight:700,color:st.accent,letterSpacing:'-.01em'}}>{st.name}</span>
+                    <span style={{marginLeft:'auto',fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',padding:'2px 7px',borderRadius:4,background:'rgba(0,0,0,.06)',color:st.tagC}}>{st.tag}</span>
+                  </div>
+                  <p style={{margin:'5px 0 0',fontSize:11,color:'var(--t2)',lineHeight:1.5}}>{LEG_INTENT[strategy]}</p>
+                </div>
+                <div style={{padding:'13px 15px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 14px'}}>
+                  {leg(
+                    LEG_LABELS[strategy]?.[0]||'Leg 1', true,
+                    ()=>{setSelectingLeg(1);setShowOptionsModal(true);},
+                    selectedContract&&<ContractBadge contract={selectedContract} onClear={()=>setSelectedContract(null)}/>,
+                    strike, setStrike, premium, setPremium, false
+                  )}
+                  <div style={{borderLeft:'1px solid var(--brd)',paddingLeft:14}}>
+                    {leg(
+                      LEG_LABELS[strategy]?.[1]||'Leg 2', false,
+                      ()=>{setSelectingLeg(2);setShowOptionsModal(true);},
+                      selectedContract2&&<ContractBadge contract={selectedContract2} onClear={()=>setSelectedContract2(null)}/>,
+                      leg2Strike,
+                      strategy==='calendar_spread'?()=>{}:setLeg2Strike,
+                      leg2Premium, setLeg2Premium,
+                      strategy==='calendar_spread'
+                    )}
+                  </div>
+                </div>
+                <div style={{borderTop:'1px solid var(--brd)',marginTop:12,paddingTop:10,display:'grid',gridTemplateColumns:dualDte?'1fr 1fr 1fr':'1fr 1fr',gap:10}}>
+                  {dualDte?(
+                    <>
+                      <div className="field">
+                        <label className="flabel" style={{fontSize:9.5}}>Leg 1 DTE</label>
+                        <div className="inp-wrap">
+                          <input type="number" className="inp" value={dte} step={1} min={0}
+                            style={{...inpSm,paddingRight:38}}
+                            onChange={e=>setDte(parseFloat(e.target.value)||0)}/>
+                          <span className="inp-sfx" style={{fontSize:10}}>days</span>
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label className="flabel" style={{fontSize:9.5}}>Leg 2 DTE</label>
+                        <div className="inp-wrap">
+                          <input type="number" className="inp" value={leg2Dte} step={1} min={0}
+                            style={{...inpSm,paddingRight:38}}
+                            onChange={e=>setLeg2Dte(parseFloat(e.target.value)||0)}/>
+                          <span className="inp-sfx" style={{fontSize:10}}>days</span>
+                        </div>
+                      </div>
+                    </>
+                  ):(
+                    <div className="field">
+                      <label className="flabel" style={{fontSize:9.5}}>DTE</label>
+                      <div className="inp-wrap">
+                        <input type="number" className="inp" value={dte} step={1} min={0}
+                          style={{...inpSm,paddingRight:38}}
+                          onChange={e=>setDte(parseFloat(e.target.value)||0)}/>
+                        <span className="inp-sfx" style={{fontSize:10}}>days</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="field">
+                    <label className="flabel" style={{fontSize:9.5}}>IV</label>
+                    <div className="inp-wrap">
+                      <input type="number" className="inp" value={iv} step={0.1} min={0.1}
+                        style={{...inpSm,paddingRight:28}}
+                        onChange={e=>{const v=parseFloat(e.target.value)||0;setIv(v);setLeg2Iv(v);}}/>
+                      <span className="inp-sfx" style={{fontSize:10}}>%</span>
+                    </div>
+                  </div>
+                </div>
+                {(()=>{
+                  const net=parseFloat((premium-leg2Premium).toFixed(2));
+                  const isDebit=net>0;
+                  const isCredit=net<0;
+                  if(!isDebit&&!isCredit) return null;
+                  const color=isDebit?'var(--red)':'var(--green)';
+                  const bg=isDebit?'var(--red-bg)':'var(--green-bg)';
+                  const brd=isDebit?'var(--red-brd)':'var(--green-brd)';
+                  const label=isDebit?'Net Debit':'Net Credit';
+                  const desc=isDebit
+                    ?`You pay $${Math.abs(net).toFixed(2)}/share ($${(Math.abs(net)*100).toFixed(0)}/contract) to enter`
+                    :`You collect $${Math.abs(net).toFixed(2)}/share ($${(Math.abs(net)*100).toFixed(0)}/contract) to enter`;
+                  return(
+                    <div style={{marginTop:10,padding:'7px 10px',borderRadius:7,background:bg,border:`1px solid ${brd}`,display:'flex',alignItems:'baseline',gap:7}}>
+                      <span style={{fontSize:11,fontWeight:800,fontFamily:'var(--mono)',color}}>{label}: ${Math.abs(net).toFixed(2)}</span>
+                      <span style={{fontSize:10,color:'var(--t3)',lineHeight:1.4}}>{desc}</span>
+                    </div>
+                  );
+                })()}
+                </div>{/* end inner padding */}
+              </div>
+            );
+          })()}
+
 
           {/* Parameters */}
           <div className="card cp fu2">
             <div className="slabel">Parameters</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              <PInput label="Strike Price"   value={strike}    onChange={setStrike}    prefix="$" step={.5}/>
-              <PInput label="Option Premium" value={premium}   onChange={setPremium}   prefix="$" step={.05}/>
-              <PInput label="Contracts"      value={contracts} onChange={setContracts} step={1}   min={1}/>
-              <PInput label="Days to Expiry" value={dte}       onChange={setDte}       suffix="days" step={1} min={0}/>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <div>
-                  <PInput label="Impl. Vol" value={iv} onChange={setIv} suffix="%" step={0.1} min={0.1}/>
-                  {selectedContract&&(
-                    <div style={{fontSize:9.5,color:"var(--green)",marginTop:3,fontWeight:600}}>
-                      {selectedContract.iv&&selectedContract.iv>0.005?"↑ From API":"↑ Back-calculated from market price"}
-                    </div>
-                  )}
-                </div>
-                <PInput label="Risk-Free" value={rfr} onChange={setRfr} suffix="%" step={.25}/>
-              </div>
+              <PInput label="Contracts" value={contracts} onChange={v=>{setContracts(v);if(strategy==='covered_call')setSharesOwned(v*100);}} step={1} min={1}/>
+              <PInput label="Risk-Free" value={rfr} onChange={setRfr} suffix="%" step={.25}/>
               <div style={{borderTop:"1px solid var(--brd-lt)",paddingTop:10,marginTop:2}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                   <span className="flabel">Price Range (Chart &amp; Table)</span>
@@ -1893,8 +2419,8 @@ function OptionsLab(){
               <div className="card fu3">
                 <div className="chart-hd">
                   <div>
-                    <div className="chart-title">P&L at Expiration</div>
-                    <div className="chart-sub">Intrinsic value only — time premium = $0</div>
+                    <div className="chart-title">P&L Scenarios — Price × Time</div>
+                    <div className="chart-sub">How P&L changes at key time checkpoints across the price range</div>
                   </div>
                   <div style={{textAlign:"right",fontSize:11.5,color:"var(--t3)",fontFamily:"var(--mono)"}}>
                     Strike <span style={{color:st.accent,fontWeight:700}}>${strike.toFixed(2)}</span>
@@ -1907,37 +2433,52 @@ function OptionsLab(){
                     <thead>
                       <tr>
                         <th>Stock Price</th>
-                        <th>P&L / Share</th>
-                        <th>Total P&L</th>
-                        <th>Return</th>
+                        <th title={`P&L at 20% into contract (~${Math.round(dte*0.8)}d remaining)`}>Early ({Math.round(dte*0.8)}d left)</th>
+                        <th title={`P&L at halfway point (~${Math.round(dte*0.5)}d remaining)`}>Halfway ({Math.round(dte*0.5)}d left)</th>
+                        <th>At Expiry</th>
+                        <th>Return at Expiry</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(()=>{
                         const bearish=strategy==='long_put'||strategy==='covered_call';
-                        // Bearish: deep below strike → only 3 above current
-                        // Bullish: only 3 below current → deep above strike
                         const lo=bearish?Math.max(strike*0.68,0.01):Math.max(sp*0.91,0.01);
                         const hi=bearish?sp*1.12:strike*1.32;
                         const N=18;
-                        const step=(hi-lo)/(N-1);
+                        const rawStep=(hi-lo)/(N-1);
+                        // Build price array then inject exact sp and strike
+                        const prices=Array.from({length:N},(_,i)=>lo+rawStep*i);
+                        // Inject exact current price
+                        let closestIdx=0,closestDist=Infinity;
+                        prices.forEach((p,i)=>{const d=Math.abs(p-sp);if(d<closestDist){closestDist=d;closestIdx=i;}});
+                        prices[closestIdx]=sp;
+                        // Inject exact strike price (only if in range and not overwriting sp slot)
+                        if(strike>=lo&&strike<=hi){
+                          let strikeIdx=0,strikeDist=Infinity;
+                          prices.forEach((p,i)=>{const d=Math.abs(p-strike);if(d<strikeDist&&i!==closestIdx){strikeDist=d;strikeIdx=i;}});
+                          prices[strikeIdx]=strike;
+                        }
                         const basis=premium*n;
-                        return Array.from({length:N},(_,i)=>{
-                          const price=lo+step*i;
-                          const total=pnl(strategy,params,price,0);
-                          const ps=total/n;
-                          const pct=basis>0?(total/basis)*100:0;
-                          const isCur=Math.abs(price-sp)<step*.55;
-                          const isStrike=Math.abs(price-strike)<step*.55;
+                        const d80=Math.round(dte*0.8);
+                        const d50=Math.round(dte*0.5);
+                        return prices.map((price,i)=>{
+                          const totalExp=pnl(strategy,params,price,0);
+                          const total80=pnl(strategy,params,price,d80);
+                          const total50=pnl(strategy,params,price,d50);
+                          const pct=basis>0?(totalExp/basis)*100:0;
+                          const isCur=price===sp;
+                          const isStrike=!isCur&&price===strike;
+                          const fmtCell=(v)=>v>=0?`+$${v.toFixed(2)}`:`-$${Math.abs(v).toFixed(2)}`;
                           return(
                             <tr key={i} className={isCur?"cur":""}>
                               <td>
                                 ${price.toFixed(2)}
                                 {isCur&&<span style={{marginLeft:8,fontSize:9.5,fontWeight:700,color:"var(--blue)",background:"var(--blue-bg)",border:"1px solid var(--blue-brd)",padding:"1px 6px",borderRadius:4,verticalAlign:"middle"}}>NOW</span>}
-                                {isStrike&&!isCur&&<span style={{marginLeft:8,fontSize:9.5,fontWeight:700,color:"var(--amber)",background:"var(--amber-bg)",border:"1px solid var(--amber-brd)",padding:"1px 6px",borderRadius:4,verticalAlign:"middle"}}>STRIKE</span>}
+                                {isStrike&&<span style={{marginLeft:8,fontSize:9.5,fontWeight:700,color:"var(--amber)",background:"var(--amber-bg)",border:"1px solid var(--amber-brd)",padding:"1px 6px",borderRadius:4,verticalAlign:"middle"}}>STRIKE</span>}
                               </td>
-                              <td className={ps>=0?"pos":"neg"}>{ps>=0?"+":""}{ps.toFixed(2)}</td>
-                              <td className={total>=0?"pos":"neg"} style={{fontWeight:700}}>{total>=0?"+":""}${total.toFixed(2)}</td>
+                              <td className={total80>=0?"pos":"neg"}>{fmtCell(total80)}</td>
+                              <td className={total50>=0?"pos":"neg"}>{fmtCell(total50)}</td>
+                              <td className={totalExp>=0?"pos":"neg"} style={{fontWeight:700}}>{fmtCell(totalExp)}</td>
                               <td className={pct>=0?"pos":"neg"}>{pct>=0?"+":""}{pct.toFixed(1)}%</td>
                             </tr>
                           );
@@ -1953,6 +2494,9 @@ function OptionsLab(){
 
         </main>
       </div>
+
+      {/* ── Suggestion Section ── */}
+      <SuggestionSection/>
 
       {/* ── Footer ── */}
       <footer style={{
