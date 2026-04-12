@@ -721,9 +721,11 @@ const CSS=`
   .call-counter{display:none}
   .live-pill{padding:4px 9px;font-size:10px}
 
-  /* Strategy bar */
-  .strat-bar{padding:0 4px;overflow-x:auto;width:100%;box-sizing:border-box}
-  .sbtn{padding:10px 10px;gap:5px;flex:0 0 auto}
+  /* Strategy bar — 2 per row, fills full width */
+  .strat-bar{padding:0;overflow-x:visible;width:100%;box-sizing:border-box;flex-wrap:wrap}
+  .sbtn{padding:11px 6px;gap:4px;flex:0 0 50%;max-width:50%;box-sizing:border-box;min-width:0;font-size:12px}
+  .sbtn:nth-child(n+5){border-top:none}
+  .sbtn:nth-child(n+3){border-top:1px solid var(--brd)}
   .sbtn .stag{display:none}
   .strat-desc{padding:8px 14px;font-size:11.5px}
 
